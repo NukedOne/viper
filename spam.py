@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import enum
 
-source = "let x = 1 + 2*3 - 4/5;"
+source = "let x = 1 + 2*3 - 4/5; print x;"
 
 
 class TokenKind(enum.Enum):
@@ -16,6 +16,7 @@ class TokenKind(enum.Enum):
     EQUAL = enum.auto()
     SEMICOLON = enum.auto()
     IDENTIFIER = enum.auto()
+    EOF = enum.auto()
 
 
 @dataclass
@@ -83,6 +84,7 @@ def tokenize(source: str) -> list[Token]:
             case _:
                 raise Exception("Unknown token.")
         current += 1
+    tokens.append(Token(TokenKind.EOF, ""))
     return tokens
 
 
@@ -108,10 +110,10 @@ class BinaryExpressionKind(enum.Enum):
 
 @dataclass
 class LiteralExpression:
-    expr: str
+    expr: float
 
     def __repr__(self) -> str:
-        return self.expr
+        return str(self.expr)
 
 
 @dataclass
@@ -153,14 +155,20 @@ class Expression:
         return f"{self.value}"
 
 
+@dataclass
 class LetStatement:
+    expr: Expression
+
+
+@dataclass
+class PrintStatement:
     expr: Expression
 
 
 @dataclass
 class Statement:
     kind: StatementKind
-    stmt: LetStatement
+    stmt: LetStatement | PrintStatement
 
 
 @dataclass
@@ -177,7 +185,7 @@ class PrefixParselet(ABC):
 
 class NumberParselet(PrefixParselet):
     def parse(self, parser: "Parser", token: Token):
-        return Expression(ExpressionKind.LITERAL, LiteralExpression(token.value))
+        return Expression(ExpressionKind.LITERAL, LiteralExpression(float(token.value)))
 
 
 class NameParselet(PrefixParselet):
@@ -278,13 +286,13 @@ class Parser:
         self.consume()  # consume 'print'
         expr = self.parse_expression(0)
         self.consume()  # consume ';'
-        return Statement(StatementKind.PRINT, expr)
+        return Statement(StatementKind.PRINT, PrintStatement(expr))
 
     def parse_let_statement(self) -> Statement:
         self.consume()  # consume 'let'
         expr = self.parse_expression(0)
         self.consume()  # consume ';'
-        return Statement(StatementKind.LET, expr)
+        return Statement(StatementKind.LET, LetStatement(expr))
 
     def parse_statement(self) -> Statement:
         match self.tokens[0].value:
@@ -295,9 +303,46 @@ class Parser:
             case _:
                 pass
 
-    def parse(self) -> Statement:
-        ast = self.parse_statement()
+    def parse(self) -> list[Statement]:
+        ast = []
+        while not self.tokens[0].kind == TokenKind.EOF:
+            ast.append(self.parse_statement())
         return ast
+
+
+@dataclass
+class Interpreter:
+    ast: Statement
+    globals: dict[str, float]
+
+    def exec(self) -> None:
+        while self.ast:
+            stmt = self.ast.pop(0)
+            match stmt:
+                case v if v.kind == StatementKind.PRINT:
+                    expr = self._eval(v.stmt.expr)
+                    print(expr)
+                case v if v.kind == StatementKind.LET:
+                    expr = self._eval(v.stmt.expr)
+
+    def _eval(self, expr: Expression):
+        match expr.kind:
+            case ExpressionKind.LITERAL:
+                return expr.value.expr
+            case ExpressionKind.VARIABLE:
+                return self.globals[expr.value.name]
+            case ExpressionKind.ASSIGN:
+                self.globals[expr.value.lhs.value.name] = self._eval(expr.value.rhs)
+            case ExpressionKind.BINARY:
+                match expr.value.kind:
+                    case BinaryExpressionKind.ADD:
+                        return self._eval(expr.value.lhs) + self._eval(expr.value.rhs)
+                    case BinaryExpressionKind.SUB:
+                        return self._eval(expr.value.lhs) - self._eval(expr.value.rhs)
+                    case BinaryExpressionKind.MUL:
+                        return self._eval(expr.value.lhs) * self._eval(expr.value.rhs)
+                    case BinaryExpressionKind.DIV:
+                        return self._eval(expr.value.lhs) / self._eval(expr.value.rhs)
 
 
 def main() -> None:
@@ -306,6 +351,8 @@ def main() -> None:
     parser = Parser(tokens)
     ast = parser.parse()
     print(ast)
+    interpreter = Interpreter(ast, {})
+    interpreter.exec()
 
 
 if __name__ == "__main__":
