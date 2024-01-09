@@ -34,8 +34,8 @@ A: Yes, this is where the development stops.
 
 ## See also
 
-[venom](https://github.com/NukedOne/venom) - My first attempt, written in C
-[synapse](https://github.com/NukedOne/synapse) - My second attempt, written in C
+- [venom](https://github.com/NukedOne/venom) - My first attempt, written in C
+- [synapse](https://github.com/NukedOne/synapse) - My second attempt, written in C
 
 ## Licensing
 
