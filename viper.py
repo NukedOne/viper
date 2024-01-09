@@ -4,13 +4,14 @@ import enum
 import textwrap
 import typing as t
 
+
 source = textwrap.dedent(
     """
     fn fib(n) {
         if (n < 2) return n;
         return fib(n-1)+fib(n-2);
     }
-    print fib(10);
+    print fib(40);
     """
 )
 
@@ -221,16 +222,23 @@ class BinaryExpression:
                 return f"({self.lhs} / {self.rhs})"
             case v if v == BinaryExpressionKind.LT:
                 return f"({self.lhs} < {self.rhs})"
-            case v if v == BinaryExpressionKind.ASSIGN:
-                return f"({self.lhs} = {self.rhs})"
             case _:
                 raise Exception("Unknown expression kind.")
 
 
 @dataclass
+class AssignExpression:
+    lhs: "Expression"
+    rhs: "Expression"
+
+    def __repr__(self) -> str:
+        return f"({self.lhs} = {self.rhs})"
+
+
+@dataclass
 class Expression:
     kind: ExpressionKind
-    value: LiteralExpression | BinaryExpression | VariableExpression | CallExpression
+    value: LiteralExpression | BinaryExpression | VariableExpression | CallExpression | AssignExpression
 
     def __repr__(self) -> str:
         return f"{self.value}"
@@ -353,7 +361,7 @@ class BinaryOperatorParselet(InfixParselet):
             case "=":
                 return Expression(
                     ExpressionKind.ASSIGN,
-                    BinaryExpression(BinaryExpressionKind.ASSIGN, left, right),
+                    AssignExpression(left, right),
                 )
             case _:
                 raise Exception("Unknown operator.")
@@ -507,9 +515,13 @@ class Parser:
 class Interpreter:
     locals: dict[str, t.Any]
     functions: dict[str, FnStatement]
+    depth: int = 0
 
     def exec_stmt(self, stmt: Statement) -> t.Any:
         match stmt:
+            case s if s.kind == StatementKind.LET:
+                assert isinstance(s.stmt, LetStatement)
+                self._eval(s.stmt.expr)
             case s if s.kind == StatementKind.PRINT:
                 assert isinstance(s.stmt, PrintStatement)
                 expr = self._eval(s.stmt.expr)
@@ -530,16 +542,18 @@ class Interpreter:
             case s if s.kind == StatementKind.EXPRESSION:
                 assert isinstance(s.stmt, ExpressionStatement)
                 self._eval(s.stmt.expr)
+            case s if s.kind == StatementKind.BLOCK:
+                assert isinstance(s.stmt, BlockStatement)
+                self._exec(s.stmt.body)
             case _:
                 assert False, s
 
-    def exec(self, ast) -> t.Any:
+    def _exec(self, ast) -> t.Any:
         assert isinstance(ast, list)
         for stmt in ast:
             retval = self.exec_stmt(stmt)
             if retval is not None:
                 return retval
-        return None
 
     def _eval(self, expr: Expression) -> t.Any:
         match expr:
@@ -549,6 +563,9 @@ class Interpreter:
             case e if e.kind == ExpressionKind.VARIABLE:
                 assert isinstance(expr.value, VariableExpression)
                 return self.locals[expr.value.name]
+            case e if e.kind == ExpressionKind.ASSIGN:
+                assert isinstance(expr.value, AssignExpression)
+                self.locals[self._eval(expr.value.lhs)] = self._eval(expr.value.rhs)
             case e if e.kind == ExpressionKind.BINARY:
                 assert isinstance(expr.value, BinaryExpression)
                 match expr.value:
@@ -574,7 +591,7 @@ class Interpreter:
                         expr.value.args,
                     )
                 }
-                retval = self.exec(f.body)
+                retval = self._exec(f.body)
                 self.locals = old_locals
                 return retval
             case _:
@@ -586,8 +603,8 @@ def main() -> None:
     tokens = tokenizer.tokenize()
     parser = Parser(tokens)
     ast = parser.parse()
-    interpreter = Interpreter({}, {})
-    interpreter.exec(ast)
+    interpreter = Interpreter({}, {}, {})
+    interpreter._exec(ast)
 
 
 if __name__ == "__main__":
