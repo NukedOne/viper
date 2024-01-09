@@ -1,8 +1,18 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import enum
+import textwrap
+import typing as t
 
-source = "let x = 1 + 2*3 - 4/5; print x;"
+source = textwrap.dedent(
+    """
+    fn fib(n) {
+        if (n < 2) return n;
+        return fib(n-1)+fib(n-2);
+    }
+    print fib(40);
+    """
+)
 
 
 class TokenKind(enum.Enum):
@@ -14,6 +24,16 @@ class TokenKind(enum.Enum):
     STAR = enum.auto()
     SLASH = enum.auto()
     EQUAL = enum.auto()
+    LPAREN = enum.auto()
+    RPAREN = enum.auto()
+    LBRACE = enum.auto()
+    RBRACE = enum.auto()
+    IF = enum.auto()
+    ELSE = enum.auto()
+    FN = enum.auto()
+    RETURN = enum.auto()
+    LT = enum.auto()
+    COMMA = enum.auto()
     SEMICOLON = enum.auto()
     IDENTIFIER = enum.auto()
     EOF = enum.auto()
@@ -28,69 +48,117 @@ class Token:
         return self.value
 
 
-def lookahead(source: str, current: int, thing: str) -> bool:
-    return source[current + 1 : current + len(thing) + 1] == thing
+@dataclass
+class Tokenizer:
+    source: str
+    current: int = 0
 
+    def identifier(self) -> Token:
+        c = self.current
+        while (
+            self.source[c].isalpha()
+            or self.source[c].isdigit()
+            or self.source[c] == "_"
+        ):
+            c += 1
+        token = Token(TokenKind.IDENTIFIER, self.source[self.current : c])
+        self.current = c - 1
+        return token
 
-def identifier(source: str, current: int) -> Token:
-    c = current
-    while source[c].isalpha() or source[c].isdigit() or source[c] == "_":
-        c += 1
-    return Token(TokenKind.IDENTIFIER, source[current:c])
+    def number(self) -> Token:
+        c = self.current
+        while self.source[c].isdigit():
+            c += 1
+        token = Token(TokenKind.NUMBER, self.source[self.current : c])
+        self.current = c - 1
+        return token
 
+    def lookahead(self, thing: str) -> bool:
+        if self.source[self.current + 1 : self.current + len(thing) + 1] == thing:
+            self.current += len(thing)
+            return True
+        return False
 
-def number(source: str, current: int) -> Token:
-    c = current
-    while source[c].isdigit():
-        c += 1
-    return Token(TokenKind.NUMBER, source[current:c])
-
-
-def tokenize(source: str) -> list[Token]:
-    current = 0
-    tokens = []
-    while current < len(source):
-        while source[current].isspace():
-            current += 1
-        match source[current]:
-            case v if v == "l":
-                if lookahead(source, current, "et"):
-                    tokens.append(Token(TokenKind.LET, "let"))
-                    current += 3
-                else:
-                    tokens.append(identifier(source, current))
-            case v if v == "p":
-                if lookahead(source, current, "rint"):
-                    tokens.append(Token(TokenKind.PRINT, "print"))
-                    current += 5
-                else:
-                    tokens.append(identifier(source, current))
-            case v if v.isalpha():
-                tokens.append(identifier(source, current))
-            case v if v.isdigit():
-                tokens.append(number(source, current))
-            case v if v == "+":
-                tokens.append(Token(TokenKind.PLUS, "+"))
-            case v if v == "-":
-                tokens.append(Token(TokenKind.MINUS, "-"))
-            case v if v == "*":
-                tokens.append(Token(TokenKind.STAR, "*"))
-            case v if v == "/":
-                tokens.append(Token(TokenKind.SLASH, "/"))
-            case v if v == "=":
-                tokens.append(Token(TokenKind.EQUAL, "="))
-            case v if v == ";":
-                tokens.append(Token(TokenKind.SEMICOLON, ";"))
-            case _:
-                raise Exception("Unknown token.")
-        current += 1
-    tokens.append(Token(TokenKind.EOF, ""))
-    return tokens
+    def tokenize(self) -> list[Token]:
+        tokens = []
+        while self.current < len(self.source):
+            if self.source[self.current].isspace():
+                self.current += 1
+                continue
+            match self.source[self.current]:
+                case v if v == "i":
+                    if self.lookahead("f"):
+                        tokens.append(Token(TokenKind.IF, "if"))
+                    else:
+                        tokens.append(self.identifier())
+                case v if v == "f":
+                    if self.lookahead("n"):
+                        tokens.append(Token(TokenKind.FN, "fn"))
+                    else:
+                        tokens.append(self.identifier())
+                case v if v == "e":
+                    if self.lookahead("lse"):
+                        tokens.append(Token(TokenKind.ELSE, "else"))
+                    else:
+                        tokens.append(self.identifier())
+                case v if v == "l":
+                    if self.lookahead("et"):
+                        tokens.append(Token(TokenKind.LET, "let"))
+                    else:
+                        tokens.append(self.identifier())
+                case v if v == "p":
+                    if self.lookahead("rint"):
+                        tokens.append(Token(TokenKind.PRINT, "print"))
+                    else:
+                        tokens.append(self.identifier())
+                case v if v == "r":
+                    if self.lookahead("eturn"):
+                        tokens.append(Token(TokenKind.RETURN, "return"))
+                    else:
+                        tokens.append(self.identifier())
+                case v if v.isalpha():
+                    tokens.append(self.identifier())
+                case v if v.isdigit():
+                    tokens.append(self.number())
+                case v if v == "+":
+                    tokens.append(Token(TokenKind.PLUS, "+"))
+                case v if v == "-":
+                    tokens.append(Token(TokenKind.MINUS, "-"))
+                case v if v == "*":
+                    tokens.append(Token(TokenKind.STAR, "*"))
+                case v if v == "/":
+                    tokens.append(Token(TokenKind.SLASH, "/"))
+                case v if v == "=":
+                    tokens.append(Token(TokenKind.EQUAL, "="))
+                case v if v == ";":
+                    tokens.append(Token(TokenKind.SEMICOLON, ";"))
+                case v if v == ",":
+                    tokens.append(Token(TokenKind.COMMA, ","))
+                case v if v == "(":
+                    tokens.append(Token(TokenKind.LPAREN, "("))
+                case v if v == ")":
+                    tokens.append(Token(TokenKind.RPAREN, ")"))
+                case v if v == "{":
+                    tokens.append(Token(TokenKind.LBRACE, "{"))
+                case v if v == "}":
+                    tokens.append(Token(TokenKind.RBRACE, "}"))
+                case v if v == "<":
+                    tokens.append(Token(TokenKind.LT, "<"))
+                case _:
+                    raise Exception("Unknown token.")
+            self.current += 1
+        tokens.append(Token(TokenKind.EOF, ""))
+        return tokens
 
 
 class StatementKind(enum.Enum):
     LET = enum.auto()
     PRINT = enum.auto()
+    IF = enum.auto()
+    FN = enum.auto()
+    BLOCK = enum.auto()
+    RETURN = enum.auto()
+    EXPRESSION = enum.auto()
 
 
 class ExpressionKind(enum.Enum):
@@ -98,6 +166,7 @@ class ExpressionKind(enum.Enum):
     BINARY = enum.auto()
     LITERAL = enum.auto()
     VARIABLE = enum.auto()
+    CALL = enum.auto()
 
 
 class BinaryExpressionKind(enum.Enum):
@@ -105,7 +174,17 @@ class BinaryExpressionKind(enum.Enum):
     SUB = enum.auto()
     MUL = enum.auto()
     DIV = enum.auto()
+    LT = enum.auto()
     ASSIGN = enum.auto()
+
+
+@dataclass
+class CallExpression:
+    callee: "Expression"
+    args: list["Expression"]
+
+    def __repr__(self) -> str:
+        return f"{self.callee}({self.args})"
 
 
 @dataclass
@@ -140,6 +219,8 @@ class BinaryExpression:
                 return f"({self.lhs} * {self.rhs})"
             case v if v == BinaryExpressionKind.DIV:
                 return f"({self.lhs} / {self.rhs})"
+            case v if v == BinaryExpressionKind.LT:
+                return f"({self.lhs} < {self.rhs})"
             case v if v == BinaryExpressionKind.ASSIGN:
                 return f"({self.lhs} = {self.rhs})"
             case _:
@@ -166,9 +247,38 @@ class PrintStatement:
 
 
 @dataclass
+class IfStatement:
+    condition: Expression
+    then_branch: "Statement"
+    else_branch: t.Optional["Statement"]
+
+
+@dataclass
+class FnStatement:
+    name: str
+    arguments: list[Expression]
+    body: list["Statement"]
+
+
+@dataclass
+class BlockStatement:
+    body: list["Statement"]
+
+
+@dataclass
+class ReturnStatement:
+    expr: Expression
+
+
+@dataclass
+class ExpressionStatement:
+    expr: Expression
+
+
+@dataclass
 class Statement:
     kind: StatementKind
-    stmt: LetStatement | PrintStatement
+    stmt: LetStatement | PrintStatement | FnStatement | IfStatement | BlockStatement | ExpressionStatement | ReturnStatement
 
 
 @dataclass
@@ -179,7 +289,7 @@ class PrefixExpression:
 
 class PrefixParselet(ABC):
     @abstractmethod
-    def parse(self) -> Expression:
+    def parse(self, parser: "Parser", token: Token) -> Expression:
         pass
 
 
@@ -197,6 +307,14 @@ class InfixParselet(ABC):
     @abstractmethod
     def parse(self, parser: "Parser", left: Expression, token: Token) -> Expression:
         pass
+
+
+class CallParselet(InfixParselet):
+    def parse(self, parser: "Parser", left: Expression, token: Token) -> Expression:
+        args = []
+        args.append(parser.parse_expression(0))
+        parser.consume()
+        return Expression(ExpressionKind.CALL, CallExpression(left, args))
 
 
 class BinaryOperatorParselet(InfixParselet):
@@ -223,6 +341,11 @@ class BinaryOperatorParselet(InfixParselet):
                     ExpressionKind.BINARY,
                     BinaryExpression(BinaryExpressionKind.DIV, left, right),
                 )
+            case "<":
+                return Expression(
+                    ExpressionKind.BINARY,
+                    BinaryExpression(BinaryExpressionKind.LT, left, right),
+                )
             case "=":
                 return Expression(
                     ExpressionKind.ASSIGN,
@@ -238,10 +361,12 @@ class Parser:
     tokens: list[Token]
     precedence: dict[TokenKind, int] = {
         TokenKind.EQUAL: 1,
+        TokenKind.LT: 2,
         TokenKind.PLUS: 3,
         TokenKind.MINUS: 3,
         TokenKind.STAR: 4,
         TokenKind.SLASH: 4,
+        TokenKind.LPAREN: 8,
         TokenKind.NUMBER: 10,
     }
 
@@ -252,6 +377,8 @@ class Parser:
         self.register(TokenKind.STAR, BinaryOperatorParselet())
         self.register(TokenKind.SLASH, BinaryOperatorParselet())
         self.register(TokenKind.EQUAL, BinaryOperatorParselet())
+        self.register(TokenKind.LT, BinaryOperatorParselet())
+        self.register(TokenKind.LPAREN, CallParselet())
         self.register(TokenKind.NUMBER, NumberParselet())
         self.register(TokenKind.IDENTIFIER, NameParselet())
 
@@ -275,10 +402,12 @@ class Parser:
     def parse_expression(self, desired_precedence: int) -> Expression:
         token = self.consume()
         prefix_parselet = self.prefix_parselets.get(token.kind, None)
+        assert prefix_parselet is not None, f"unable to parse token: {token}"
         left = prefix_parselet.parse(self, token)
         while desired_precedence < self.next_token_precedence():
             token = self.consume()
             infix_parselet = self.infix_parselets.get(token.kind, None)
+            assert infix_parselet is not None, f"unable to parse token: {token}"
             left = infix_parselet.parse(self, left, token)
         return left
 
@@ -294,14 +423,73 @@ class Parser:
         self.consume()  # consume ';'
         return Statement(StatementKind.LET, LetStatement(expr))
 
+    def check(self, kind: TokenKind) -> bool:
+        return self.tokens[0].kind == kind
+
+    def parse_fn_statement(self) -> Statement:
+        self.consume()  # consume 'fn'
+        name = self.consume()  # consume fn name
+        self.consume()  # consume '('
+        arguments = []
+        while not self.check(TokenKind.RPAREN):
+            arguments.append(self.parse_expression(0))
+        self.consume()  # consume ')'
+        self.consume()  # consume '{'
+        body = []
+        while not self.check(TokenKind.RBRACE):
+            body.append(self.parse_statement())
+        self.consume()  # consume '}'
+        return Statement(StatementKind.FN, FnStatement(name.value, arguments, body))
+
+    def parse_return_statement(self) -> Statement:
+        self.consume()  # consume 'return'
+        expr = self.parse_expression(0)
+        self.consume()  # consume ';'
+        return Statement(StatementKind.RETURN, ReturnStatement(expr))
+
+    def parse_if_statement(self) -> Statement:
+        self.consume()  # consume 'if'
+        self.consume()  # consume '('
+        condition = self.parse_expression(0)
+        self.consume()  # consume ')'
+        then_branch = self.parse_statement()
+        else_branch = None
+        if self.check(TokenKind.ELSE):
+            self.consume()
+            else_branch = self.parse_statement()
+        return Statement(
+            StatementKind.IF, IfStatement(condition, then_branch, else_branch)
+        )
+
+    def parse_block_statement(self) -> Statement:
+        self.consume()  # consume '{'
+        body = []
+        while not self.check(TokenKind.RBRACE):
+            body.append(self.parse_statement())
+        self.consume()  # consume '}'
+        return Statement(StatementKind.BLOCK, BlockStatement(body))
+
+    def parse_expression_statement(self) -> Statement:
+        expr = self.parse_expression(0)
+        self.consume()  # consume ";"
+        return Statement(StatementKind.EXPRESSION, ExpressionStatement(expr))
+
     def parse_statement(self) -> Statement:
         match self.tokens[0].value:
             case v if v == "let":
                 return self.parse_let_statement()
             case v if v == "print":
                 return self.parse_print_statement()
+            case v if v == "fn":
+                return self.parse_fn_statement()
+            case v if v == "if":
+                return self.parse_if_statement()
+            case v if v == "return":
+                return self.parse_return_statement()
+            case v if v == "{":
+                return self.parse_block_statement()
             case _:
-                pass
+                return self.parse_expression_statement()
 
     def parse(self) -> list[Statement]:
         ast = []
@@ -312,47 +500,81 @@ class Parser:
 
 @dataclass
 class Interpreter:
-    ast: Statement
-    globals: dict[str, float]
+    locals: dict[str, t.Any]
+    functions: dict[str, FnStatement]
 
-    def exec(self) -> None:
-        while self.ast:
-            stmt = self.ast.pop(0)
-            match stmt:
-                case v if v.kind == StatementKind.PRINT:
-                    expr = self._eval(v.stmt.expr)
-                    print(expr)
-                case v if v.kind == StatementKind.LET:
-                    expr = self._eval(v.stmt.expr)
+    def exec_stmt(self, v: Statement) -> t.Any:
+        if v.kind == StatementKind.PRINT:
+            assert isinstance(v.stmt, PrintStatement)
+            expr = self._eval(v.stmt.expr)
+            print(expr)
+            return None
+        if v.kind == StatementKind.IF:
+            assert isinstance(v.stmt, IfStatement)
+            if self._eval(v.stmt.condition):
+                return self.exec_stmt(v.stmt.then_branch)
+            return None
+        if v.kind == StatementKind.FN:
+            assert isinstance(v.stmt, FnStatement)
+            self.functions[v.stmt.name] = v.stmt
+            return None
+        if v.kind == StatementKind.RETURN:
+            assert isinstance(v.stmt, ReturnStatement)
+            return self._eval(v.stmt.expr)
+        if v.kind == StatementKind.EXPRESSION:
+            assert isinstance(v.stmt, ExpressionStatement)
+            self._eval(v.stmt.expr)
+            return None
+        assert False, v
 
-    def _eval(self, expr: Expression):
-        match expr.kind:
-            case ExpressionKind.LITERAL:
-                return expr.value.expr
-            case ExpressionKind.VARIABLE:
-                return self.globals[expr.value.name]
-            case ExpressionKind.ASSIGN:
-                self.globals[expr.value.lhs.value.name] = self._eval(expr.value.rhs)
-            case ExpressionKind.BINARY:
-                match expr.value.kind:
-                    case BinaryExpressionKind.ADD:
-                        return self._eval(expr.value.lhs) + self._eval(expr.value.rhs)
-                    case BinaryExpressionKind.SUB:
-                        return self._eval(expr.value.lhs) - self._eval(expr.value.rhs)
-                    case BinaryExpressionKind.MUL:
-                        return self._eval(expr.value.lhs) * self._eval(expr.value.rhs)
-                    case BinaryExpressionKind.DIV:
-                        return self._eval(expr.value.lhs) / self._eval(expr.value.rhs)
+    def exec(self, ast) -> t.Any:
+        assert isinstance(ast, list)
+        for stmt in ast:
+            retval = self.exec_stmt(stmt)
+            if retval is not None:
+                return retval
+        return None
+
+    def _eval(self, expr: Expression) -> t.Any:
+        if expr.kind == ExpressionKind.LITERAL:
+            assert isinstance(expr.value, LiteralExpression)
+            return expr.value.expr
+        if expr.kind == ExpressionKind.VARIABLE:
+            assert isinstance(expr.value, VariableExpression)
+            return self.locals[expr.value.name]
+        if expr.kind == ExpressionKind.BINARY:
+            assert isinstance(expr.value, BinaryExpression)
+            if expr.value.kind == BinaryExpressionKind.ADD:
+                return self._eval(expr.value.lhs) + self._eval(expr.value.rhs)
+            if expr.value.kind == BinaryExpressionKind.SUB:
+                return self._eval(expr.value.lhs) - self._eval(expr.value.rhs)
+            if expr.value.kind == BinaryExpressionKind.MUL:
+                return self._eval(expr.value.lhs) * self._eval(expr.value.rhs)
+            if expr.value.kind == BinaryExpressionKind.DIV:
+                return self._eval(expr.value.lhs) / self._eval(expr.value.rhs)
+            if expr.value.kind == BinaryExpressionKind.LT:
+                return self._eval(expr.value.lhs) < self._eval(expr.value.rhs)
+        if expr.kind == ExpressionKind.CALL:
+            assert isinstance(expr.value, CallExpression)
+            f = self.functions[expr.value.callee.value.name]
+            old_locals = self.locals
+            self.locals = {
+                k: self._eval(v)
+                for k, v in zip([x.value.name for x in f.arguments], expr.value.args)
+            }
+            retval = self.exec(f.body)
+            self.locals = old_locals
+            return retval
+        assert False, expr
 
 
 def main() -> None:
-    tokens = tokenize(source)
-    print(tokens)
+    tokenizer = Tokenizer(source)
+    tokens = tokenizer.tokenize()
     parser = Parser(tokens)
     ast = parser.parse()
-    print(ast)
-    interpreter = Interpreter(ast, {})
-    interpreter.exec()
+    interpreter = Interpreter({}, {})
+    interpreter.exec(ast)
 
 
 if __name__ == "__main__":
