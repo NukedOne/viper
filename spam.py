@@ -230,7 +230,7 @@ class BinaryExpression:
 @dataclass
 class Expression:
     kind: ExpressionKind
-    value: LiteralExpression | BinaryExpression | VariableExpression
+    value: LiteralExpression | BinaryExpression | VariableExpression | CallExpression
 
     def __repr__(self) -> str:
         return f"{self.value}"
@@ -394,7 +394,7 @@ class Parser:
         elif isinstance(parselet, InfixParselet):
             self.infix_parselets[kind] = parselet
 
-    def consume(self, kind: TokenKind = None) -> Token:
+    def consume(self, kind: TokenKind | None) -> Token:
         assert len(self.tokens) > 0
         if kind is not None:
             assert (
@@ -409,12 +409,12 @@ class Parser:
         return 0
 
     def parse_expression(self, desired_precedence: int) -> Expression:
-        token = self.consume()
+        token = self.consume(None)
         prefix_parselet = self.prefix_parselets.get(token.kind, None)
         assert prefix_parselet is not None, f"unable to parse token: {token}"
         left = prefix_parselet.parse(self, token)
         while desired_precedence < self.next_token_precedence():
-            token = self.consume()
+            token = self.consume(None)
             infix_parselet = self.infix_parselets.get(token.kind, None)
             assert infix_parselet is not None, f"unable to parse token: {token}"
             left = infix_parselet.parse(self, left, token)
@@ -564,12 +564,14 @@ class Interpreter:
                         return self._eval(expr.value.lhs) < self._eval(expr.value.rhs)
             case e if e.kind == ExpressionKind.CALL:
                 assert isinstance(expr.value, CallExpression)
+                assert isinstance(expr.value.callee.value, VariableExpression)
                 f = self.functions[expr.value.callee.value.name]
                 old_locals = self.locals
                 self.locals = {
                     k: self._eval(v)
                     for k, v in zip(
-                        [x.value.name for x in f.arguments], expr.value.args
+                        [x.value.name for x in f.arguments],  # type: ignore
+                        expr.value.args,
                     )
                 }
                 retval = self.exec(f.body)
