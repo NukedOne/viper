@@ -508,29 +508,30 @@ class Interpreter:
     locals: dict[str, t.Any]
     functions: dict[str, FnStatement]
 
-    def exec_stmt(self, v: Statement) -> t.Any:
-        if v.kind == StatementKind.PRINT:
-            assert isinstance(v.stmt, PrintStatement)
-            expr = self._eval(v.stmt.expr)
-            print(expr)
-            return None
-        if v.kind == StatementKind.IF:
-            assert isinstance(v.stmt, IfStatement)
-            if self._eval(v.stmt.condition):
-                return self.exec_stmt(v.stmt.then_branch)
-            return None
-        if v.kind == StatementKind.FN:
-            assert isinstance(v.stmt, FnStatement)
-            self.functions[v.stmt.name] = v.stmt
-            return None
-        if v.kind == StatementKind.RETURN:
-            assert isinstance(v.stmt, ReturnStatement)
-            return self._eval(v.stmt.expr)
-        if v.kind == StatementKind.EXPRESSION:
-            assert isinstance(v.stmt, ExpressionStatement)
-            self._eval(v.stmt.expr)
-            return None
-        assert False, v
+    def exec_stmt(self, stmt: Statement) -> t.Any:
+        match stmt:
+            case s if s.kind == StatementKind.PRINT:
+                assert isinstance(s.stmt, PrintStatement)
+                expr = self._eval(s.stmt.expr)
+                print(expr)
+            case s if s.kind == StatementKind.IF:
+                assert isinstance(s.stmt, IfStatement)
+                if self._eval(s.stmt.condition):
+                    return self.exec_stmt(s.stmt.then_branch)
+                else:
+                    if s.stmt.else_branch is not None:
+                        return self.exec_stmt(s.stmt.else_branch)
+            case s if s.kind == StatementKind.FN:
+                assert isinstance(s.stmt, FnStatement)
+                self.functions[s.stmt.name] = s.stmt
+            case s if s.kind == StatementKind.RETURN:
+                assert isinstance(s.stmt, ReturnStatement)
+                return self._eval(s.stmt.expr)
+            case s if s.kind == StatementKind.EXPRESSION:
+                assert isinstance(s.stmt, ExpressionStatement)
+                self._eval(s.stmt.expr)
+            case _:
+                assert False, s
 
     def exec(self, ast) -> t.Any:
         assert isinstance(ast, list)
