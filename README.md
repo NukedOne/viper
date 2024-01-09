@@ -25,9 +25,11 @@ sys	0m8,946s
 ## FAQ
 
 Q: Why?
+
 A: I wanted to know how slow tree-walk interpreters are compared to their bytecode cousins, and also how slow CPython is compared to its cousin PyPy.
 
 Q: Is this...?
+
 A: Yes, this is where the development stops.
 
 ## See also
