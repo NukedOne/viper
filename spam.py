@@ -10,7 +10,7 @@ source = textwrap.dedent(
         if (n < 2) return n;
         return fib(n-1)+fib(n-2);
     }
-    print fib(40);
+    print fib(10);
     """
 )
 
@@ -312,8 +312,12 @@ class InfixParselet(ABC):
 class CallParselet(InfixParselet):
     def parse(self, parser: "Parser", left: Expression, token: Token) -> Expression:
         args = []
-        args.append(parser.parse_expression(0))
-        parser.consume()
+        if not parser.match([TokenKind.RPAREN]):
+            while True:
+                args.append(parser.parse_expression(0))
+                if not parser.match([TokenKind.COMMA]):
+                    break
+        parser.consume(TokenKind.RPAREN)
         return Expression(ExpressionKind.CALL, CallExpression(left, args))
 
 
@@ -390,8 +394,13 @@ class Parser:
         elif isinstance(parselet, InfixParselet):
             self.infix_parselets[kind] = parselet
 
-    def consume(self) -> Token:
+    def consume(self, kind: TokenKind = None) -> Token:
         assert len(self.tokens) > 0
+        if kind is not None:
+            assert (
+                self.tokens[0].kind == kind
+            ), f"found {self.tokens[0].kind}: {self.tokens[0]}, expected {kind}"
+            return self.tokens.pop(0)
         return self.tokens.pop(0)
 
     def next_token_precedence(self) -> int:
@@ -412,84 +421,80 @@ class Parser:
         return left
 
     def parse_print_statement(self) -> Statement:
-        self.consume()  # consume 'print'
         expr = self.parse_expression(0)
-        self.consume()  # consume ';'
+        self.consume(TokenKind.SEMICOLON)
         return Statement(StatementKind.PRINT, PrintStatement(expr))
 
     def parse_let_statement(self) -> Statement:
-        self.consume()  # consume 'let'
         expr = self.parse_expression(0)
-        self.consume()  # consume ';'
+        self.consume(TokenKind.SEMICOLON)
         return Statement(StatementKind.LET, LetStatement(expr))
 
     def check(self, kind: TokenKind) -> bool:
         return self.tokens[0].kind == kind
 
+    def match(self, kinds: list[TokenKind]) -> bool:
+        for kind in kinds:
+            if self.check(kind):
+                self.consume(kind)
+                return True
+        return False
+
     def parse_fn_statement(self) -> Statement:
-        self.consume()  # consume 'fn'
-        name = self.consume()  # consume fn name
-        self.consume()  # consume '('
+        name = self.consume(TokenKind.IDENTIFIER)
+        self.consume(TokenKind.LPAREN)
         arguments = []
-        while not self.check(TokenKind.RPAREN):
+        while not self.match([TokenKind.RPAREN]):
             arguments.append(self.parse_expression(0))
-        self.consume()  # consume ')'
-        self.consume()  # consume '{'
+        self.consume(TokenKind.LBRACE)
         body = []
-        while not self.check(TokenKind.RBRACE):
+        while not self.match([TokenKind.RBRACE]):
             body.append(self.parse_statement())
-        self.consume()  # consume '}'
         return Statement(StatementKind.FN, FnStatement(name.value, arguments, body))
 
     def parse_return_statement(self) -> Statement:
-        self.consume()  # consume 'return'
         expr = self.parse_expression(0)
-        self.consume()  # consume ';'
+        self.consume(TokenKind.SEMICOLON)
         return Statement(StatementKind.RETURN, ReturnStatement(expr))
 
     def parse_if_statement(self) -> Statement:
-        self.consume()  # consume 'if'
-        self.consume()  # consume '('
+        self.consume(TokenKind.LPAREN)
         condition = self.parse_expression(0)
-        self.consume()  # consume ')'
+        self.consume(TokenKind.RPAREN)
         then_branch = self.parse_statement()
         else_branch = None
-        if self.check(TokenKind.ELSE):
-            self.consume()
+        if self.match([TokenKind.ELSE]):
             else_branch = self.parse_statement()
         return Statement(
             StatementKind.IF, IfStatement(condition, then_branch, else_branch)
         )
 
     def parse_block_statement(self) -> Statement:
-        self.consume()  # consume '{'
         body = []
-        while not self.check(TokenKind.RBRACE):
+        while not self.match([TokenKind.RBRACE]):
             body.append(self.parse_statement())
-        self.consume()  # consume '}'
         return Statement(StatementKind.BLOCK, BlockStatement(body))
 
     def parse_expression_statement(self) -> Statement:
         expr = self.parse_expression(0)
-        self.consume()  # consume ";"
+        self.consume(TokenKind.SEMICOLON)
         return Statement(StatementKind.EXPRESSION, ExpressionStatement(expr))
 
     def parse_statement(self) -> Statement:
-        match self.tokens[0].value:
-            case v if v == "let":
-                return self.parse_let_statement()
-            case v if v == "print":
-                return self.parse_print_statement()
-            case v if v == "fn":
-                return self.parse_fn_statement()
-            case v if v == "if":
-                return self.parse_if_statement()
-            case v if v == "return":
-                return self.parse_return_statement()
-            case v if v == "{":
-                return self.parse_block_statement()
-            case _:
-                return self.parse_expression_statement()
+        if self.match([TokenKind.LET]):
+            return self.parse_let_statement()
+        elif self.match([TokenKind.PRINT]):
+            return self.parse_print_statement()
+        elif self.match([TokenKind.FN]):
+            return self.parse_fn_statement()
+        elif self.match([TokenKind.IF]):
+            return self.parse_if_statement()
+        elif self.match([TokenKind.RETURN]):
+            return self.parse_return_statement()
+        elif self.match([TokenKind.LBRACE]):
+            return self.parse_block_statement()
+        else:
+            return self.parse_expression_statement()
 
     def parse(self) -> list[Statement]:
         ast = []
