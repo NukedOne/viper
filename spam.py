@@ -542,36 +542,41 @@ class Interpreter:
         return None
 
     def _eval(self, expr: Expression) -> t.Any:
-        if expr.kind == ExpressionKind.LITERAL:
-            assert isinstance(expr.value, LiteralExpression)
-            return expr.value.expr
-        if expr.kind == ExpressionKind.VARIABLE:
-            assert isinstance(expr.value, VariableExpression)
-            return self.locals[expr.value.name]
-        if expr.kind == ExpressionKind.BINARY:
-            assert isinstance(expr.value, BinaryExpression)
-            if expr.value.kind == BinaryExpressionKind.ADD:
-                return self._eval(expr.value.lhs) + self._eval(expr.value.rhs)
-            if expr.value.kind == BinaryExpressionKind.SUB:
-                return self._eval(expr.value.lhs) - self._eval(expr.value.rhs)
-            if expr.value.kind == BinaryExpressionKind.MUL:
-                return self._eval(expr.value.lhs) * self._eval(expr.value.rhs)
-            if expr.value.kind == BinaryExpressionKind.DIV:
-                return self._eval(expr.value.lhs) / self._eval(expr.value.rhs)
-            if expr.value.kind == BinaryExpressionKind.LT:
-                return self._eval(expr.value.lhs) < self._eval(expr.value.rhs)
-        if expr.kind == ExpressionKind.CALL:
-            assert isinstance(expr.value, CallExpression)
-            f = self.functions[expr.value.callee.value.name]
-            old_locals = self.locals
-            self.locals = {
-                k: self._eval(v)
-                for k, v in zip([x.value.name for x in f.arguments], expr.value.args)
-            }
-            retval = self.exec(f.body)
-            self.locals = old_locals
-            return retval
-        assert False, expr
+        match expr:
+            case e if e.kind == ExpressionKind.LITERAL:
+                assert isinstance(expr.value, LiteralExpression)
+                return expr.value.expr
+            case e if e.kind == ExpressionKind.VARIABLE:
+                assert isinstance(expr.value, VariableExpression)
+                return self.locals[expr.value.name]
+            case e if e.kind == ExpressionKind.BINARY:
+                assert isinstance(expr.value, BinaryExpression)
+                match expr.value:
+                    case binexp if binexp.kind == BinaryExpressionKind.ADD:
+                        return self._eval(expr.value.lhs) + self._eval(expr.value.rhs)
+                    case binexp if binexp.kind == BinaryExpressionKind.SUB:
+                        return self._eval(expr.value.lhs) - self._eval(expr.value.rhs)
+                    case binexp if binexp.kind == BinaryExpressionKind.MUL:
+                        return self._eval(expr.value.lhs) * self._eval(expr.value.rhs)
+                    case binexp if binexp.kind == BinaryExpressionKind.DIV:
+                        return self._eval(expr.value.lhs) / self._eval(expr.value.rhs)
+                    case binexp if binexp.kind == BinaryExpressionKind.LT:
+                        return self._eval(expr.value.lhs) < self._eval(expr.value.rhs)
+            case e if e.kind == ExpressionKind.CALL:
+                assert isinstance(expr.value, CallExpression)
+                f = self.functions[expr.value.callee.value.name]
+                old_locals = self.locals
+                self.locals = {
+                    k: self._eval(v)
+                    for k, v in zip(
+                        [x.value.name for x in f.arguments], expr.value.args
+                    )
+                }
+                retval = self.exec(f.body)
+                self.locals = old_locals
+                return retval
+            case _:
+                assert False, expr
 
 
 def main() -> None:
