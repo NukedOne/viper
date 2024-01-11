@@ -143,6 +143,8 @@ class Tokenizer:
                     tokens.append(Token(TokenKind.LBRACE, "{"))
                 case v if v == "}":
                     tokens.append(Token(TokenKind.RBRACE, "}"))
+                case v if v == ",":
+                    tokens.append(Token(TokenKind.COMMA, ","))
                 case v if v == "<":
                     tokens.append(Token(TokenKind.LT, "<"))
                 case _:
@@ -452,8 +454,12 @@ class Parser:
         name = self.consume(TokenKind.IDENTIFIER)
         self.consume(TokenKind.LPAREN)
         arguments = []
-        while not self.match([TokenKind.RPAREN]):
-            arguments.append(self.parse_expression(0))
+        if not self.match([TokenKind.RPAREN]):
+            while True:
+                arguments.append(self.parse_expression(0))
+                if not self.match([TokenKind.COMMA]):
+                    break
+        self.consume(TokenKind.RPAREN)
         self.consume(TokenKind.LBRACE)
         body = []
         while not self.match([TokenKind.RBRACE]):
@@ -565,7 +571,7 @@ class Interpreter:
                 return self.locals[expr.value.name]
             case e if e.kind == ExpressionKind.ASSIGN:
                 assert isinstance(expr.value, AssignExpression)
-                self.locals[self._eval(expr.value.lhs)] = self._eval(expr.value.rhs)
+                self.locals[expr.value.lhs.value.name] = self._eval(expr.value.rhs)
             case e if e.kind == ExpressionKind.BINARY:
                 assert isinstance(expr.value, BinaryExpression)
                 match expr.value:
