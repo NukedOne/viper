@@ -4,16 +4,25 @@ import enum
 import textwrap
 import typing as t
 
-
 source = textwrap.dedent(
     """
-    fn fib(n) {
-        if (n < 2) return n;
-        return fib(n-1)+fib(n-2);
+    let x = 1;
+    fn f(n) {
+        return n+x;
     }
-    print fib(40);
+    print f(2);
     """
 )
+
+# source = textwrap.dedent(
+#     """
+#     fn fib(n) {
+#         if (n < 2) return n;
+#         return fib(n-1)+fib(n-2);
+#     }
+#     print fib(40);
+#     """
+# )
 
 
 class TokenKind(enum.Enum):
@@ -267,7 +276,7 @@ class IfStatement:
 class FnStatement:
     name: str
     arguments: list[Expression]
-    body: list["Statement"]
+    body: "Statement"
 
 
 @dataclass
@@ -460,10 +469,10 @@ class Parser:
                 if not self.match([TokenKind.COMMA]):
                     break
         self.consume(TokenKind.RPAREN)
-        self.consume(TokenKind.LBRACE)
-        body = []
-        while not self.match([TokenKind.RBRACE]):
-            body.append(self.parse_statement())
+        # self.consume(TokenKind.LBRACE)
+        # body = []
+        # while not self.match([TokenKind.RBRACE]):
+        body = self.parse_statement()
         return Statement(StatementKind.FN, FnStatement(name.value, arguments, body))
 
     def parse_return_statement(self) -> Statement:
@@ -519,6 +528,7 @@ class Parser:
 
 @dataclass
 class Interpreter:
+    globals: dict[str, t.Any]
     locals: dict[str, t.Any]
     functions: dict[str, FnStatement]
     depth: int = 0
@@ -550,7 +560,9 @@ class Interpreter:
                 self._eval(s.stmt.expr)
             case s if s.kind == StatementKind.BLOCK:
                 assert isinstance(s.stmt, BlockStatement)
+                self.depth += 1
                 self._exec(s.stmt.body)
+                self.depth -= 1
             case _:
                 assert False, s
 
@@ -561,6 +573,19 @@ class Interpreter:
             if retval is not None:
                 return retval
 
+    def is_local(self, name: str) -> bool:
+        return name in self.locals
+
+    def is_global(self, name: str) -> bool:
+        return name in self.globals
+
+    def resolve(self, name: str) -> t.Any:
+        if self.is_local(name):
+            return self.locals[name]
+        elif self.is_global(name):
+            return self.globals[name]
+        raise Exception(f"{name} is not defined.")
+
     def _eval(self, expr: Expression) -> t.Any:
         match expr:
             case e if e.kind == ExpressionKind.LITERAL:
@@ -568,10 +593,13 @@ class Interpreter:
                 return expr.value.expr
             case e if e.kind == ExpressionKind.VARIABLE:
                 assert isinstance(expr.value, VariableExpression)
-                return self.locals[expr.value.name]
+                return self.resolve(expr.value.name)
             case e if e.kind == ExpressionKind.ASSIGN:
                 assert isinstance(expr.value, AssignExpression)
-                self.locals[expr.value.lhs.value.name] = self._eval(expr.value.rhs)
+                if self.depth > 0:
+                    self.locals[expr.value.lhs.value.name] = self._eval(expr.value.rhs)
+                else:
+                    self.globals[expr.value.lhs.value.name] = self._eval(expr.value.rhs)
             case e if e.kind == ExpressionKind.BINARY:
                 assert isinstance(expr.value, BinaryExpression)
                 match expr.value:
@@ -597,7 +625,7 @@ class Interpreter:
                         expr.value.args,
                     )
                 }
-                retval = self._exec(f.body)
+                retval = self._exec(f.body.stmt.body)
                 self.locals = old_locals
                 return retval
             case _:
