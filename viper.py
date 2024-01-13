@@ -6,13 +6,27 @@ import typing as t
 
 source = textwrap.dedent(
     """
-    let x = 1;
-    fn f(n) {
-        return n+x;
+    fn main() {
+        let x = 0;
+        while (x < 5) {
+            print x;
+            x = x + 1;
+        }
+        return 0;
     }
-    print f(2);
+    main();
     """
 )
+
+# source = textwrap.dedent(
+#     """
+#     let x = 1;
+#     fn f(n) {
+#         return n+x;
+#     }
+#     print f(2);
+#     """
+# )
 
 # source = textwrap.dedent(
 #     """
@@ -41,6 +55,7 @@ class TokenKind(enum.Enum):
     IF = enum.auto()
     ELSE = enum.auto()
     FN = enum.auto()
+    WHILE = enum.auto()
     RETURN = enum.auto()
     LT = enum.auto()
     COMMA = enum.auto()
@@ -126,6 +141,11 @@ class Tokenizer:
                         tokens.append(Token(TokenKind.RETURN, "return"))
                     else:
                         tokens.append(self.identifier())
+                case v if v == "w":
+                    if self.lookahead("hile"):
+                        tokens.append(Token(TokenKind.WHILE, "while"))
+                    else:
+                        tokens.append(self.identifier())
                 case v if v.isalpha():
                     tokens.append(self.identifier())
                 case v if v.isdigit():
@@ -168,6 +188,7 @@ class StatementKind(enum.Enum):
     PRINT = enum.auto()
     IF = enum.auto()
     FN = enum.auto()
+    WHILE = enum.auto()
     BLOCK = enum.auto()
     RETURN = enum.auto()
     EXPRESSION = enum.auto()
@@ -290,6 +311,12 @@ class ReturnStatement:
 
 
 @dataclass
+class WhileStatement:
+    condition: Expression
+    body: "Statement"
+
+
+@dataclass
 class ExpressionStatement:
     expr: Expression
 
@@ -297,7 +324,7 @@ class ExpressionStatement:
 @dataclass
 class Statement:
     kind: StatementKind
-    stmt: LetStatement | PrintStatement | FnStatement | IfStatement | BlockStatement | ExpressionStatement | ReturnStatement
+    stmt: LetStatement | PrintStatement | FnStatement | IfStatement | BlockStatement | ExpressionStatement | ReturnStatement | WhileStatement
 
 
 @dataclass
@@ -336,7 +363,7 @@ class CallParselet(InfixParselet):
                 args.append(parser.parse_expression(0))
                 if not parser.match([TokenKind.COMMA]):
                     break
-        parser.consume(TokenKind.RPAREN)
+            parser.consume(TokenKind.RPAREN)
         return Expression(ExpressionKind.CALL, CallExpression(left, args))
 
 
@@ -459,6 +486,13 @@ class Parser:
                 return True
         return False
 
+    def parse_while_statement(self) -> Statement:
+        self.consume(TokenKind.LPAREN)
+        condition = self.parse_expression(0)
+        self.consume(TokenKind.RPAREN)
+        body = self.parse_statement()
+        return Statement(StatementKind.WHILE, WhileStatement(condition, body))
+
     def parse_fn_statement(self) -> Statement:
         name = self.consume(TokenKind.IDENTIFIER)
         self.consume(TokenKind.LPAREN)
@@ -468,10 +502,7 @@ class Parser:
                 arguments.append(self.parse_expression(0))
                 if not self.match([TokenKind.COMMA]):
                     break
-        self.consume(TokenKind.RPAREN)
-        # self.consume(TokenKind.LBRACE)
-        # body = []
-        # while not self.match([TokenKind.RBRACE]):
+            self.consume(TokenKind.RPAREN)
         body = self.parse_statement()
         return Statement(StatementKind.FN, FnStatement(name.value, arguments, body))
 
@@ -510,6 +541,8 @@ class Parser:
             return self.parse_print_statement()
         elif self.match([TokenKind.FN]):
             return self.parse_fn_statement()
+        elif self.match([TokenKind.WHILE]):
+            return self.parse_while_statement()
         elif self.match([TokenKind.IF]):
             return self.parse_if_statement()
         elif self.match([TokenKind.RETURN]):
@@ -552,6 +585,10 @@ class Interpreter:
             case s if s.kind == StatementKind.FN:
                 assert isinstance(s.stmt, FnStatement)
                 self.functions[s.stmt.name] = s.stmt
+            case s if s.kind == StatementKind.WHILE:
+                assert isinstance(s.stmt, WhileStatement)
+                while self._eval(s.stmt.condition):
+                    self._exec(s.stmt.body.stmt.body)
             case s if s.kind == StatementKind.RETURN:
                 assert isinstance(s.stmt, ReturnStatement)
                 return self._eval(s.stmt.expr)
