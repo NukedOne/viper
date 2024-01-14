@@ -1,54 +1,10 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import enum
-import textwrap
 import typing as t
 
-source = textwrap.dedent(
-    """
-    fn main() {
-        for (let x = 0; x < 5; x = x + 1) {
-            print x;
-        }
-        return 0;
-    }
-    main();
-    """
-)
 
-# source = textwrap.dedent(
-#     """
-#     fn main() {
-#         let x = 0;
-#         while (x < 5) {
-#             print x;
-#             x = x + 1;
-#         }
-#         return 0;
-#     }
-#     main();
-#     """
-# )
-
-# source = textwrap.dedent(
-#     """
-#     let x = 1;
-#     fn f(n) {
-#         return n+x;
-#     }
-#     print f(2);
-#     """
-# )
-
-# source = textwrap.dedent(
-#     """
-#     fn fib(n) {
-#         if (n < 2) return n;
-#         return fib(n-1)+fib(n-2);
-#     }
-#     print fib(40);
-#     """
-# )
+source = ""
 
 
 class TokenKind(enum.Enum):
@@ -648,8 +604,10 @@ class Interpreter:
             case s if s.kind == StatementKind.BLOCK:
                 assert isinstance(s.stmt, BlockStatement)
                 self.depth += 1
-                self._exec(s.stmt.body)
+                retval = self._exec(s.stmt.body)
                 self.depth -= 1
+                if retval is not None:
+                    return retval
             case _:
                 assert False, s
 
