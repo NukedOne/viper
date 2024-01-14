@@ -7,16 +7,28 @@ import typing as t
 source = textwrap.dedent(
     """
     fn main() {
-        let x = 0;
-        while (x < 5) {
+        for (let x = 0; x < 5; x = x + 1) {
             print x;
-            x = x + 1;
         }
         return 0;
     }
     main();
     """
 )
+
+# source = textwrap.dedent(
+#     """
+#     fn main() {
+#         let x = 0;
+#         while (x < 5) {
+#             print x;
+#             x = x + 1;
+#         }
+#         return 0;
+#     }
+#     main();
+#     """
+# )
 
 # source = textwrap.dedent(
 #     """
@@ -56,6 +68,7 @@ class TokenKind(enum.Enum):
     ELSE = enum.auto()
     FN = enum.auto()
     WHILE = enum.auto()
+    FOR = enum.auto()
     RETURN = enum.auto()
     LT = enum.auto()
     COMMA = enum.auto()
@@ -119,6 +132,8 @@ class Tokenizer:
                 case v if v == "f":
                     if self.lookahead("n"):
                         tokens.append(Token(TokenKind.FN, "fn"))
+                    elif self.lookahead("or"):
+                        tokens.append(Token(TokenKind.FOR, "for"))
                     else:
                         tokens.append(self.identifier())
                 case v if v == "e":
@@ -189,6 +204,7 @@ class StatementKind(enum.Enum):
     IF = enum.auto()
     FN = enum.auto()
     WHILE = enum.auto()
+    FOR = enum.auto()
     BLOCK = enum.auto()
     RETURN = enum.auto()
     EXPRESSION = enum.auto()
@@ -313,6 +329,14 @@ class ReturnStatement:
 @dataclass
 class WhileStatement:
     condition: Expression
+    body: "Statement"
+
+
+@dataclass
+class ForStatement:
+    initializer: Expression
+    condition: Expression
+    advancement: Expression
     body: "Statement"
 
 
@@ -493,6 +517,20 @@ class Parser:
         body = self.parse_statement()
         return Statement(StatementKind.WHILE, WhileStatement(condition, body))
 
+    def parse_for_statement(self) -> Statement:
+        self.consume(TokenKind.LPAREN)
+        self.consume(TokenKind.LET)
+        initializer = self.parse_expression(0)
+        self.consume(TokenKind.SEMICOLON)
+        condition = self.parse_expression(0)
+        self.consume(TokenKind.SEMICOLON)
+        advancement = self.parse_expression(0)
+        self.consume(TokenKind.RPAREN)
+        body = self.parse_statement()
+        return Statement(
+            StatementKind.FOR, ForStatement(initializer, condition, advancement, body)
+        )
+
     def parse_fn_statement(self) -> Statement:
         name = self.consume(TokenKind.IDENTIFIER)
         self.consume(TokenKind.LPAREN)
@@ -543,6 +581,8 @@ class Parser:
             return self.parse_fn_statement()
         elif self.match([TokenKind.WHILE]):
             return self.parse_while_statement()
+        elif self.match([TokenKind.FOR]):
+            return self.parse_for_statement()
         elif self.match([TokenKind.IF]):
             return self.parse_if_statement()
         elif self.match([TokenKind.RETURN]):
@@ -589,6 +629,16 @@ class Interpreter:
                 assert isinstance(s.stmt, WhileStatement)
                 while self._eval(s.stmt.condition):
                     self._exec(s.stmt.body.stmt.body)
+            case s if s.kind == StatementKind.FOR:
+                assert isinstance(s.stmt, ForStatement)
+                self._eval(s.stmt.initializer)
+                while self._eval(s.stmt.condition):
+                    self._exec(s.stmt.body.stmt.body)
+                    self._eval(s.stmt.advancement)
+                if self.depth > 0:
+                    del self.locals[s.stmt.initializer.value.lhs.value.name]
+                else:
+                    del self.globals[s.stmt.initializer.value.lhs.value.name]
             case s if s.kind == StatementKind.RETURN:
                 assert isinstance(s.stmt, ReturnStatement)
                 return self._eval(s.stmt.expr)
@@ -662,7 +712,7 @@ class Interpreter:
                         expr.value.args,
                     )
                 }
-                retval = self._exec(f.body.stmt.body)
+                retval = self.exec_stmt(f.body)
                 self.locals = old_locals
                 return retval
             case _:
