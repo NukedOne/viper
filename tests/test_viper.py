@@ -9,7 +9,9 @@ ASSERTIONS = {
 
 
 def test_viper(capsys):
-    from viper import Tokenizer, Parser, Interpreter
+    from viper.tokenizer import Tokenizer
+    from viper._parser import Parser
+    from viper.interpreter import Interpreter
 
     for filename, assertions in ASSERTIONS.items():
         with open(f"tests/cases/{filename}.vpr", "r") as f:

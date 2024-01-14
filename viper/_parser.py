@@ -4,25 +4,13 @@ import typing as t
 from viper.tokenizer import Token, TokenKind
 from abc import ABC, abstractmethod
 
-
-class StatementKind(enum.Enum):
-    LET = enum.auto()
-    PRINT = enum.auto()
-    IF = enum.auto()
-    FN = enum.auto()
-    WHILE = enum.auto()
-    FOR = enum.auto()
-    BLOCK = enum.auto()
-    RETURN = enum.auto()
-    EXPRESSION = enum.auto()
+if t.TYPE_CHECKING:
+    Interpreter = t.Any
 
 
-class ExpressionKind(enum.Enum):
-    ASSIGN = enum.auto()
-    BINARY = enum.auto()
-    LITERAL = enum.auto()
-    VARIABLE = enum.auto()
-    CALL = enum.auto()
+class Expression(ABC):
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        pass
 
 
 class BinaryExpressionKind(enum.Enum):
@@ -34,36 +22,59 @@ class BinaryExpressionKind(enum.Enum):
     ASSIGN = enum.auto()
 
 
-@dataclass
-class CallExpression:
-    callee: "Expression"
-    args: list["Expression"]
+class CallExpression(Expression):
+    def __init__(self, callee: Expression, args: list[Expression]) -> None:
+        self.callee = callee
+        self.args = args
 
     def __repr__(self) -> str:
         return f"{self.callee}({self.args})"
 
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        assert isinstance(self.callee, VariableExpression)
+        f = interpreter.functions[self.callee.name]
+        old_locals = interpreter.locals
+        interpreter.locals = {
+            k: v.eval(interpreter)
+            for k, v in zip(
+                [arg.name for arg in f.arguments],  # type: ignore
+                self.args,
+            )
+        }
+        retval = f.body.exec(interpreter)
+        interpreter.locals = old_locals
+        return retval
 
-@dataclass
-class LiteralExpression:
-    expr: float
+
+class LiteralExpression(Expression):
+    def __init__(self, expr: float) -> None:
+        self.expr = expr
 
     def __repr__(self) -> str:
         return str(self.expr)
 
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        return self.expr
 
-@dataclass
-class VariableExpression:
-    name: str
+
+class VariableExpression(Expression):
+    def __init__(self, name: str) -> None:
+        self.name = name
 
     def __repr__(self) -> str:
         return self.name
 
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        return interpreter.resolve(self.name)
 
-@dataclass
-class BinaryExpression:
-    kind: "BinaryExpressionKind"
-    lhs: "Expression"
-    rhs: "Expression"
+
+class BinaryExpression(Expression):
+    def __init__(
+        self, kind: BinaryExpressionKind, lhs: Expression, rhs: Expression
+    ) -> None:
+        self.lhs = lhs
+        self.rhs = rhs
+        self.kind = kind
 
     def __repr__(self) -> str:
         match self.kind:
@@ -80,82 +91,150 @@ class BinaryExpression:
             case _:
                 raise Exception("Unknown expression kind.")
 
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        match self.kind:
+            case v if v == BinaryExpressionKind.ADD:
+                return self.lhs.eval(interpreter) + self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.SUB:
+                return self.lhs.eval(interpreter) - self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.MUL:
+                return self.lhs.eval(interpreter) * self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.DIV:
+                return self.lhs.eval(interpreter) / self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.LT:
+                return self.lhs.eval(interpreter) < self.rhs.eval(interpreter)
 
-@dataclass
-class AssignExpression:
-    lhs: "Expression"
-    rhs: "Expression"
+
+class AssignExpression(Expression):
+    def __init__(self, lhs: Expression, rhs: Expression) -> None:
+        self.lhs = lhs
+        self.rhs = rhs
 
     def __repr__(self) -> str:
         return f"({self.lhs} = {self.rhs})"
 
-
-@dataclass
-class Expression:
-    kind: ExpressionKind
-    value: LiteralExpression | BinaryExpression | VariableExpression | CallExpression | AssignExpression
-
-    def __repr__(self) -> str:
-        return f"{self.value}"
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        assert isinstance(self.lhs, VariableExpression)
+        if interpreter.depth > 0:
+            interpreter.locals[self.lhs.name] = self.rhs.eval(interpreter)
+        else:
+            interpreter.globals[self.lhs.name] = self.rhs.eval(interpreter)
 
 
-@dataclass
-class LetStatement:
-    expr: Expression
+class Statement(ABC):
+    @abstractmethod
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        pass
 
 
-@dataclass
-class PrintStatement:
-    expr: Expression
+class LetStatement(Statement):
+    def __init__(self, expr: Expression) -> None:
+        self.initializer = expr
+
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        self.initializer.eval(interpreter)
 
 
-@dataclass
-class IfStatement:
-    condition: Expression
-    then_branch: "Statement"
-    else_branch: t.Optional["Statement"]
+class PrintStatement(Statement):
+    def __init__(self, expr: Expression) -> None:
+        self.expr = expr
+
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        expr = self.expr.eval(interpreter)
+        print(expr)
 
 
-@dataclass
-class FnStatement:
-    name: str
-    arguments: list[Expression]
-    body: "Statement"
+class IfStatement(Statement):
+    def __init__(
+        self,
+        condition: Expression,
+        then_branch: Statement,
+        else_branch: t.Optional[Statement],
+    ) -> None:
+        self.condition = condition
+        self.then_branch = then_branch
+        self.else_branch = else_branch
+
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        if self.condition.eval(interpreter):
+            return self.then_branch.exec(interpreter)
+        else:
+            if self.else_branch is not None:
+                return self.else_branch.exec(interpreter)
 
 
-@dataclass
-class BlockStatement:
-    body: list["Statement"]
+class FnStatement(Statement):
+    def __init__(self, name: str, arguments: list[Expression], body: Statement) -> None:
+        self.name = name
+        self.arguments = arguments
+        self.body = body
+
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        interpreter.functions[self.name] = self
 
 
-@dataclass
-class ReturnStatement:
-    expr: Expression
+class BlockStatement(Statement):
+    def __init__(self, body: list[Statement]) -> None:
+        self.body = body
+
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        interpreter.depth += 1
+        retval = interpreter._exec(self.body)
+        interpreter.depth -= 1
+        if retval is not None:
+            return retval
 
 
-@dataclass
-class WhileStatement:
-    condition: Expression
-    body: "Statement"
+class ReturnStatement(Statement):
+    def __init__(self, expr: Expression) -> None:
+        self.expr = expr
+
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        return self.expr.eval(interpreter)
 
 
-@dataclass
-class ForStatement:
-    initializer: Expression
-    condition: Expression
-    advancement: Expression
-    body: "Statement"
+class WhileStatement(Statement):
+    def __init__(self, condition: Expression, body: Statement) -> None:
+        self.condition = condition
+        self.body = body
+
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        while self.condition.eval(interpreter):
+            self.body.exec(interpreter)
 
 
-@dataclass
-class ExpressionStatement:
-    expr: Expression
+class ForStatement(Statement):
+    def __init__(
+        self,
+        initializer: Expression,
+        condition: Expression,
+        advancement: Expression,
+        body: Statement,
+    ) -> None:
+        self.initializer = initializer
+        self.condition = condition
+        self.advancement = advancement
+        self.body = body
+
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        assert isinstance(self.initializer, AssignExpression)
+        assert isinstance(self.initializer.lhs, VariableExpression)
+        self.initializer.eval(interpreter)
+        while self.condition.eval(interpreter):
+            self.body.exec(interpreter)
+            self.advancement.eval(interpreter)
+        if interpreter.depth > 0:
+            del interpreter.locals[self.initializer.lhs.name]
+        else:
+            del interpreter.globals[self.initializer.lhs.name]
 
 
-@dataclass
-class Statement:
-    kind: StatementKind
-    stmt: LetStatement | PrintStatement | FnStatement | IfStatement | BlockStatement | ExpressionStatement | ReturnStatement | WhileStatement
+class ExpressionStatement(Statement):
+    def __init__(self, expr: Expression) -> None:
+        self.expr = expr
+
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        self.expr.eval(interpreter)
 
 
 @dataclass
@@ -171,13 +250,13 @@ class PrefixParselet(ABC):
 
 
 class NumberParselet(PrefixParselet):
-    def parse(self, parser: "Parser", token: Token):
-        return Expression(ExpressionKind.LITERAL, LiteralExpression(float(token.value)))
+    def parse(self, parser: "Parser", token: Token) -> Expression:
+        return LiteralExpression(float(token.value))
 
 
 class NameParselet(PrefixParselet):
-    def parse(self, parser: "Parser", token: Token):
-        return Expression(ExpressionKind.VARIABLE, VariableExpression(token.value))
+    def parse(self, parser: "Parser", token: Token) -> Expression:
+        return VariableExpression(token.value)
 
 
 class InfixParselet(ABC):
@@ -195,7 +274,7 @@ class CallParselet(InfixParselet):
                 if not parser.match([TokenKind.COMMA]):
                     break
             parser.consume(TokenKind.RPAREN)
-        return Expression(ExpressionKind.CALL, CallExpression(left, args))
+        return CallExpression(left, args)
 
 
 class BinaryOperatorParselet(InfixParselet):
@@ -203,35 +282,17 @@ class BinaryOperatorParselet(InfixParselet):
         right = parser.parse_expression(parser.precedence[token.kind])
         match token.value:
             case "+":
-                return Expression(
-                    ExpressionKind.BINARY,
-                    BinaryExpression(BinaryExpressionKind.ADD, left, right),
-                )
+                return BinaryExpression(BinaryExpressionKind.ADD, left, right)
             case "-":
-                return Expression(
-                    ExpressionKind.BINARY,
-                    BinaryExpression(BinaryExpressionKind.SUB, left, right),
-                )
+                return BinaryExpression(BinaryExpressionKind.SUB, left, right)
             case "*":
-                return Expression(
-                    ExpressionKind.BINARY,
-                    BinaryExpression(BinaryExpressionKind.MUL, left, right),
-                )
+                return BinaryExpression(BinaryExpressionKind.MUL, left, right)
             case "/":
-                return Expression(
-                    ExpressionKind.BINARY,
-                    BinaryExpression(BinaryExpressionKind.DIV, left, right),
-                )
+                return BinaryExpression(BinaryExpressionKind.DIV, left, right)
             case "<":
-                return Expression(
-                    ExpressionKind.BINARY,
-                    BinaryExpression(BinaryExpressionKind.LT, left, right),
-                )
+                return BinaryExpression(BinaryExpressionKind.LT, left, right)
             case "=":
-                return Expression(
-                    ExpressionKind.ASSIGN,
-                    AssignExpression(left, right),
-                )
+                return AssignExpression(left, right)
             case _:
                 raise Exception("Unknown operator.")
 
@@ -300,12 +361,12 @@ class Parser:
     def parse_print_statement(self) -> Statement:
         expr = self.parse_expression(0)
         self.consume(TokenKind.SEMICOLON)
-        return Statement(StatementKind.PRINT, PrintStatement(expr))
+        return PrintStatement(expr)
 
     def parse_let_statement(self) -> Statement:
         expr = self.parse_expression(0)
         self.consume(TokenKind.SEMICOLON)
-        return Statement(StatementKind.LET, LetStatement(expr))
+        return LetStatement(expr)
 
     def check(self, kind: TokenKind) -> bool:
         return self.tokens[0].kind == kind
@@ -322,7 +383,7 @@ class Parser:
         condition = self.parse_expression(0)
         self.consume(TokenKind.RPAREN)
         body = self.parse_statement()
-        return Statement(StatementKind.WHILE, WhileStatement(condition, body))
+        return WhileStatement(condition, body)
 
     def parse_for_statement(self) -> Statement:
         self.consume(TokenKind.LPAREN)
@@ -334,9 +395,7 @@ class Parser:
         advancement = self.parse_expression(0)
         self.consume(TokenKind.RPAREN)
         body = self.parse_statement()
-        return Statement(
-            StatementKind.FOR, ForStatement(initializer, condition, advancement, body)
-        )
+        return ForStatement(initializer, condition, advancement, body)
 
     def parse_fn_statement(self) -> Statement:
         name = self.consume(TokenKind.IDENTIFIER)
@@ -349,12 +408,12 @@ class Parser:
                     break
             self.consume(TokenKind.RPAREN)
         body = self.parse_statement()
-        return Statement(StatementKind.FN, FnStatement(name.value, arguments, body))
+        return FnStatement(name.value, arguments, body)
 
     def parse_return_statement(self) -> Statement:
         expr = self.parse_expression(0)
         self.consume(TokenKind.SEMICOLON)
-        return Statement(StatementKind.RETURN, ReturnStatement(expr))
+        return ReturnStatement(expr)
 
     def parse_if_statement(self) -> Statement:
         self.consume(TokenKind.LPAREN)
@@ -364,20 +423,18 @@ class Parser:
         else_branch = None
         if self.match([TokenKind.ELSE]):
             else_branch = self.parse_statement()
-        return Statement(
-            StatementKind.IF, IfStatement(condition, then_branch, else_branch)
-        )
+        return IfStatement(condition, then_branch, else_branch)
 
     def parse_block_statement(self) -> Statement:
         body = []
         while not self.match([TokenKind.RBRACE]):
             body.append(self.parse_statement())
-        return Statement(StatementKind.BLOCK, BlockStatement(body))
+        return BlockStatement(body)
 
     def parse_expression_statement(self) -> Statement:
         expr = self.parse_expression(0)
         self.consume(TokenKind.SEMICOLON)
-        return Statement(StatementKind.EXPRESSION, ExpressionStatement(expr))
+        return ExpressionStatement(expr)
 
     def parse_statement(self) -> Statement:
         if self.match([TokenKind.LET]):
