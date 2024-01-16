@@ -18,7 +18,20 @@ class BinaryExpressionKind(enum.Enum):
     SUB = enum.auto()
     MUL = enum.auto()
     DIV = enum.auto()
+    MOD = enum.auto()
+    BITAND = enum.auto()
+    BITOR = enum.auto()
+    BITXOR = enum.auto()
+    SHL = enum.auto()
+    SHR = enum.auto()
     LT = enum.auto()
+    GT = enum.auto()
+    LTE = enum.auto()
+    GTE = enum.auto()
+    EQUALITY = enum.auto()
+    NON_EQUALITY = enum.auto()
+    AND = enum.auto()
+    OR = enum.auto()
     ASSIGN = enum.auto()
 
 
@@ -86,8 +99,34 @@ class BinaryExpression(Expression):
                 return f"({self.lhs} * {self.rhs})"
             case v if v == BinaryExpressionKind.DIV:
                 return f"({self.lhs} / {self.rhs})"
+            case v if v == BinaryExpressionKind.MOD:
+                return f"({self.lhs} % {self.rhs})"
+            case v if v == BinaryExpressionKind.BITAND:
+                return f"({self.lhs} & {self.rhs})"
+            case v if v == BinaryExpressionKind.BITOR:
+                return f"({self.lhs} | {self.rhs})"
+            case v if v == BinaryExpressionKind.BITXOR:
+                return f"({self.lhs} ^ {self.rhs})"
+            case v if v == BinaryExpressionKind.SHL:
+                return f"({self.lhs} << {self.rhs})"
+            case v if v == BinaryExpressionKind.SHR:
+                return f"({self.lhs} >> {self.rhs})"
             case v if v == BinaryExpressionKind.LT:
                 return f"({self.lhs} < {self.rhs})"
+            case v if v == BinaryExpressionKind.GT:
+                return f"({self.lhs} > {self.rhs})"
+            case v if v == BinaryExpressionKind.LTE:
+                return f"({self.lhs} <= {self.rhs})"
+            case v if v == BinaryExpressionKind.GTE:
+                return f"({self.lhs} >= {self.rhs})"
+            case v if v == BinaryExpressionKind.EQUALITY:
+                return f"({self.lhs} == {self.rhs})"
+            case v if v == BinaryExpressionKind.NON_EQUALITY:
+                return f"({self.lhs} != {self.rhs})"
+            case v if v == BinaryExpressionKind.AND:
+                return f"({self.lhs} && {self.rhs})"
+            case v if v == BinaryExpressionKind.OR:
+                return f"({self.lhs} || {self.rhs})"
             case _:
                 raise Exception("Unknown expression kind.")
 
@@ -101,24 +140,99 @@ class BinaryExpression(Expression):
                 return self.lhs.eval(interpreter) * self.rhs.eval(interpreter)
             case v if v == BinaryExpressionKind.DIV:
                 return self.lhs.eval(interpreter) / self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.MOD:
+                return self.lhs.eval(interpreter) % self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.BITAND:
+                return self.lhs.eval(interpreter) & self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.BITOR:
+                return self.lhs.eval(interpreter) | self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.BITXOR:
+                return self.lhs.eval(interpreter) ^ self.rhs.eval(interpreter)
             case v if v == BinaryExpressionKind.LT:
                 return self.lhs.eval(interpreter) < self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.GT:
+                return self.lhs.eval(interpreter) > self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.LTE:
+                return self.lhs.eval(interpreter) <= self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.GTE:
+                return self.lhs.eval(interpreter) >= self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.AND:
+                return self.lhs.eval(interpreter) and self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.OR:
+                return self.lhs.eval(interpreter) or self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.EQUALITY:
+                return self.lhs.eval(interpreter) == self.rhs.eval(interpreter)
+            case v if v == BinaryExpressionKind.NON_EQUALITY:
+                return self.lhs.eval(interpreter) != self.rhs.eval(interpreter)
 
 
 class AssignExpression(Expression):
-    def __init__(self, lhs: Expression, rhs: Expression) -> None:
+    def __init__(self, lhs: Expression, rhs: Expression, operator: str) -> None:
         self.lhs = lhs
         self.rhs = rhs
+        self.operator = operator
 
     def __repr__(self) -> str:
-        return f"({self.lhs} = {self.rhs})"
+        return f"({self.lhs} {self.operator} {self.rhs})"
 
     def eval(self, interpreter: "Interpreter") -> t.Any:
         assert isinstance(self.lhs, VariableExpression)
-        if interpreter.depth > 0:
-            interpreter.locals[self.lhs.name] = self.rhs.eval(interpreter)
-        else:
-            interpreter.globals[self.lhs.name] = self.rhs.eval(interpreter)
+        match self.operator:
+            case o if o == "=":
+                if interpreter.depth > 0:
+                    interpreter.locals[self.lhs.name] = self.rhs.eval(interpreter)
+                else:
+                    interpreter.globals[self.lhs.name] = self.rhs.eval(interpreter)
+            case o if o == "+=":
+                if interpreter.depth > 0:
+                    interpreter.locals[self.lhs.name] += self.rhs.eval(interpreter)
+                else:
+                    interpreter.globals[self.lhs.name] += self.rhs.eval(interpreter)
+            case o if o == "-=":
+                if interpreter.depth > 0:
+                    interpreter.locals[self.lhs.name] -= self.rhs.eval(interpreter)
+                else:
+                    interpreter.globals[self.lhs.name] -= self.rhs.eval(interpreter)
+            case o if o == "*=":
+                if interpreter.depth > 0:
+                    interpreter.locals[self.lhs.name] *= self.rhs.eval(interpreter)
+                else:
+                    interpreter.globals[self.lhs.name] *= self.rhs.eval(interpreter)
+            case o if o == "/=":
+                if interpreter.depth > 0:
+                    interpreter.locals[self.lhs.name] /= self.rhs.eval(interpreter)
+                else:
+                    interpreter.globals[self.lhs.name] /= self.rhs.eval(interpreter)
+            case o if o == "%=":
+                if interpreter.depth > 0:
+                    interpreter.locals[self.lhs.name] %= self.rhs.eval(interpreter)
+                else:
+                    interpreter.globals[self.lhs.name] %= self.rhs.eval(interpreter)
+            case o if o == ">>=":
+                if interpreter.depth > 0:
+                    interpreter.locals[self.lhs.name] >>= self.rhs.eval(interpreter)
+                else:
+                    interpreter.globals[self.lhs.name] >>= self.rhs.eval(interpreter)
+            case o if o == "<<=":
+                if interpreter.depth > 0:
+                    interpreter.locals[self.lhs.name] <<= self.rhs.eval(interpreter)
+                else:
+                    interpreter.globals[self.lhs.name] <<= self.rhs.eval(interpreter)
+            case o if o == "|=":
+                if interpreter.depth > 0:
+                    interpreter.locals[self.lhs.name] |= self.rhs.eval(interpreter)
+                else:
+                    interpreter.globals[self.lhs.name] |= self.rhs.eval(interpreter)
+            case o if o == "&=":
+                if interpreter.depth > 0:
+                    interpreter.locals[self.lhs.name] &= self.rhs.eval(interpreter)
+                else:
+                    interpreter.globals[self.lhs.name] &= self.rhs.eval(interpreter)
+            case o if o == "^=":
+                if interpreter.depth > 0:
+                    interpreter.locals[self.lhs.name] ^= self.rhs.eval(interpreter)
+                else:
+                    interpreter.globals[self.lhs.name] ^= self.rhs.eval(interpreter)
 
 
 class Statement(ABC):
@@ -289,10 +403,52 @@ class BinaryOperatorParselet(InfixParselet):
                 return BinaryExpression(BinaryExpressionKind.MUL, left, right)
             case "/":
                 return BinaryExpression(BinaryExpressionKind.DIV, left, right)
+            case "%":
+                return BinaryExpression(BinaryExpressionKind.MOD, left, right)
+            case "&":
+                return BinaryExpression(BinaryExpressionKind.BITAND, left, right)
+            case "|":
+                return BinaryExpression(BinaryExpressionKind.BITOR, left, right)
+            case "^":
+                return BinaryExpression(BinaryExpressionKind.BITXOR, left, right)
             case "<":
                 return BinaryExpression(BinaryExpressionKind.LT, left, right)
+            case ">":
+                return BinaryExpression(BinaryExpressionKind.GT, left, right)
+            case ">=":
+                return BinaryExpression(BinaryExpressionKind.GTE, left, right)
+            case "<=":
+                return BinaryExpression(BinaryExpressionKind.LTE, left, right)
+            case "==":
+                return BinaryExpression(BinaryExpressionKind.EQUALITY, left, right)
+            case "!=":
+                return BinaryExpression(BinaryExpressionKind.NON_EQUALITY, left, right)
+            case "||":
+                return BinaryExpression(BinaryExpressionKind.OR, left, right)
+            case "&&":
+                return BinaryExpression(BinaryExpressionKind.AND, left, right)
             case "=":
-                return AssignExpression(left, right)
+                return AssignExpression(left, right, token.value)
+            case "+=":
+                return AssignExpression(left, right, token.value)
+            case "-=":
+                return AssignExpression(left, right, token.value)
+            case "*=":
+                return AssignExpression(left, right, token.value)
+            case "/=":
+                return AssignExpression(left, right, token.value)
+            case "%=":
+                return AssignExpression(left, right, token.value)
+            case "&=":
+                return AssignExpression(left, right, token.value)
+            case "|=":
+                return AssignExpression(left, right, token.value)
+            case "^=":
+                return AssignExpression(left, right, token.value)
+            case ">>=":
+                return AssignExpression(left, right, token.value)
+            case "<<=":
+                return AssignExpression(left, right, token.value)
             case _:
                 raise Exception("Unknown operator.")
 
@@ -303,13 +459,37 @@ class Parser:
     tokens: list[Token]
     precedence: dict[TokenKind, int] = {
         TokenKind.EQUAL: 1,
-        TokenKind.LT: 2,
-        TokenKind.PLUS: 3,
-        TokenKind.MINUS: 3,
-        TokenKind.STAR: 4,
-        TokenKind.SLASH: 4,
-        TokenKind.LPAREN: 8,
-        TokenKind.NUMBER: 10,
+        TokenKind.PLUSEQUAL: 1,
+        TokenKind.MINUSEQUAL: 1,
+        TokenKind.STAREQUAL: 1,
+        TokenKind.SLASHEQUAL: 1,
+        TokenKind.SHLEQUAL: 1,
+        TokenKind.SHREQUAL: 1,
+        TokenKind.BITANDEQUAL: 1,
+        TokenKind.BITOREQUAL: 1,
+        TokenKind.BITXOREQUAL: 1,
+        TokenKind.MODEQUAL: 1,
+        TokenKind.OR: 2,
+        TokenKind.AND: 3,
+        TokenKind.BITOR: 4,
+        TokenKind.BITXOR: 5,
+        TokenKind.BITAND: 6,
+        TokenKind.DOUBLE_EQUAL: 7,
+        TokenKind.BANGEQUAL: 7,
+        TokenKind.LT: 8,
+        TokenKind.LTE: 8,
+        TokenKind.GT: 8,
+        TokenKind.GTE: 8,
+        TokenKind.SHL: 9,
+        TokenKind.SHR: 9,
+        TokenKind.PLUS: 10,
+        TokenKind.MINUS: 10,
+        TokenKind.STAR: 11,
+        TokenKind.SLASH: 11,
+        TokenKind.MOD: 11,
+        TokenKind.BANG: 12,
+        TokenKind.LPAREN: 13,
+        TokenKind.NUMBER: 14,
     }
 
     def __init__(self, tokens: list[Token]) -> None:
@@ -319,6 +499,26 @@ class Parser:
         self.register(TokenKind.STAR, BinaryOperatorParselet())
         self.register(TokenKind.SLASH, BinaryOperatorParselet())
         self.register(TokenKind.EQUAL, BinaryOperatorParselet())
+        self.register(TokenKind.DOUBLE_EQUAL, BinaryOperatorParselet())
+        self.register(TokenKind.BANGEQUAL, BinaryOperatorParselet())
+        self.register(TokenKind.PLUSEQUAL, BinaryOperatorParselet())
+        self.register(TokenKind.MINUSEQUAL, BinaryOperatorParselet())
+        self.register(TokenKind.STAREQUAL, BinaryOperatorParselet())
+        self.register(TokenKind.SLASHEQUAL, BinaryOperatorParselet())
+        self.register(TokenKind.BITANDEQUAL, BinaryOperatorParselet())
+        self.register(TokenKind.BITXOREQUAL, BinaryOperatorParselet())
+        self.register(TokenKind.BITOREQUAL, BinaryOperatorParselet())
+        self.register(TokenKind.BITOR, BinaryOperatorParselet())
+        self.register(TokenKind.BITAND, BinaryOperatorParselet())
+        self.register(TokenKind.BITXOR, BinaryOperatorParselet())
+        self.register(TokenKind.SHL, BinaryOperatorParselet())
+        self.register(TokenKind.SHR, BinaryOperatorParselet())
+        self.register(TokenKind.SHLEQUAL, BinaryOperatorParselet())
+        self.register(TokenKind.SHREQUAL, BinaryOperatorParselet())
+        self.register(TokenKind.MODEQUAL, BinaryOperatorParselet())
+        self.register(TokenKind.MOD, BinaryOperatorParselet())
+        self.register(TokenKind.AND, BinaryOperatorParselet())
+        self.register(TokenKind.OR, BinaryOperatorParselet())
         self.register(TokenKind.LT, BinaryOperatorParselet())
         self.register(TokenKind.LPAREN, CallParselet())
         self.register(TokenKind.NUMBER, NumberParselet())

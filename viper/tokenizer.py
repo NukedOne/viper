@@ -82,15 +82,69 @@ class Tokenizer:
                 case v if v.isdigit():
                     tokens.append(self.number())
                 case v if v == "+":
-                    tokens.append(Token(TokenKind.PLUS, "+"))
+                    if self.lookahead("="):
+                        tokens.append(Token(TokenKind.PLUSEQUAL, "+="))
+                    else:
+                        tokens.append(Token(TokenKind.PLUS, "+"))
                 case v if v == "-":
-                    tokens.append(Token(TokenKind.MINUS, "-"))
+                    if self.lookahead("="):
+                        tokens.append(Token(TokenKind.MINUSEQUAL, "-="))
+                    else:
+                        tokens.append(Token(TokenKind.MINUS, "-"))
                 case v if v == "*":
-                    tokens.append(Token(TokenKind.STAR, "*"))
+                    if self.lookahead("="):
+                        tokens.append(Token(TokenKind.STAREQUAL, "*="))
+                    else:
+                        tokens.append(Token(TokenKind.STAR, "*"))
                 case v if v == "/":
-                    tokens.append(Token(TokenKind.SLASH, "/"))
+                    if self.lookahead("="):
+                        tokens.append(Token(TokenKind.SLASHEQUAL, "/="))
+                    else:
+                        tokens.append(Token(TokenKind.SLASH, "/"))
                 case v if v == "=":
-                    tokens.append(Token(TokenKind.EQUAL, "="))
+                    if self.lookahead("="):
+                        tokens.append(Token(TokenKind.DOUBLE_EQUAL, "=="))
+                    else:
+                        tokens.append(Token(TokenKind.EQUAL, "="))
+                case v if v == "%":
+                    if self.lookahead("="):
+                        tokens.append(Token(TokenKind.MODEQUAL, "%="))
+                    else:
+                        tokens.append(Token(TokenKind.MOD, "%"))
+                case v if v == "&":
+                    if self.lookahead("="):
+                        tokens.append(Token(TokenKind.BITANDEQUAL, "&="))
+                    elif self.lookahead("&"):
+                        tokens.append(Token(TokenKind.AND, "&&"))
+                    else:
+                        tokens.append(Token(TokenKind.BITAND, "&"))
+                case v if v == "|":
+                    if self.lookahead("="):
+                        tokens.append(Token(TokenKind.BITOREQUAL, "|="))
+                    elif self.lookahead("|"):
+                        tokens.append(Token(TokenKind.OR, "||"))
+                    else:
+                        tokens.append(Token(TokenKind.BITOR, "|"))
+                case v if v == "^":
+                    if self.lookahead("="):
+                        tokens.append(Token(TokenKind.BITXOREQUAL, "^="))
+                    else:
+                        tokens.append(Token(TokenKind.BITXOR, "^"))
+                case v if v == ">>":
+                    if self.lookahead("="):
+                        tokens.append(Token(TokenKind.SHREQUAL, ">>="))
+                    else:
+                        tokens.append(Token(TokenKind.SHR, ">>"))
+                case v if v == "<<":
+                    if self.lookahead("="):
+                        tokens.append(Token(TokenKind.SHLEQUAL, "<<="))
+                    else:
+                        tokens.append(Token(TokenKind.SHL, "<<"))
+                case v if v == "!":
+                    if self.lookahead("="):
+                        tokens.append(Token(TokenKind.BANGEQUAL, "!="))
+                    else:
+                        tokens.append(Token(TokenKind.BANG, "!"))
                 case v if v == ";":
                     tokens.append(Token(TokenKind.SEMICOLON, ";"))
                 case v if v == ",":
@@ -146,4 +200,28 @@ class TokenKind(enum.Enum):
     COMMA = enum.auto()
     SEMICOLON = enum.auto()
     IDENTIFIER = enum.auto()
+    PLUSEQUAL = enum.auto()
+    MINUSEQUAL = enum.auto()
+    STAREQUAL = enum.auto()
+    SLASHEQUAL = enum.auto()
+    SHLEQUAL = enum.auto()
+    SHREQUAL = enum.auto()
+    BITANDEQUAL = enum.auto()
+    BITOREQUAL = enum.auto()
+    BITXOREQUAL = enum.auto()
+    MODEQUAL = enum.auto()
+    OR = enum.auto()
+    AND = enum.auto()
+    BITOR = enum.auto()
+    BITXOR = enum.auto()
+    BITAND = enum.auto()
+    LTE = enum.auto()
+    GT = enum.auto()
+    GTE = enum.auto()
+    SHL = enum.auto()
+    SHR = enum.auto()
+    MOD = enum.auto()
     EOF = enum.auto()
+    DOUBLE_EQUAL = enum.auto()
+    BANG = enum.auto()
+    BANGEQUAL = enum.auto()
