@@ -21,7 +21,17 @@ class Tokenizer:
 
     def number(self) -> "Token":
         c = self.current
-        while self.source[c].isdigit():
+        seen_floating_point = False
+        while True:
+            if self.source[c].isdigit():
+                pass
+            elif self.source[c] == ".":
+                if not seen_floating_point:
+                    seen_floating_point = True
+                else:
+                    raise Exception("Can't tokenize float")
+            else:
+                break
             c += 1
         token = Token(TokenKind.NUMBER, self.source[self.current : c])
         self.current = c - 1
