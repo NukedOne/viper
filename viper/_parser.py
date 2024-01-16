@@ -210,6 +210,8 @@ class LiteralParselet(PrefixParselet):
                 return LiteralExpression(True if t.value == "true" else False)
             case t if t.kind == TokenKind.NUMBER:
                 return LiteralExpression(float(token.value))
+            case t if t.kind == TokenKind.STRING:
+                return LiteralExpression(token.value)
             case _:
                 raise NotImplementedError(f"Couldn't parse: {token.value}")
 
@@ -471,6 +473,7 @@ class Parser:
         self.register(TokenKind.NUMBER, LiteralParselet())
         self.register(TokenKind.TRUE, LiteralParselet())
         self.register(TokenKind.FALSE, LiteralParselet())
+        self.register(TokenKind.STRING, LiteralParselet())
         self.register(TokenKind.IDENTIFIER, NameParselet())
         self.register(TokenKind.BANG, UnaryParselet())
         self.register(TokenKind.MINUS, UnaryParselet())

@@ -37,6 +37,14 @@ class Tokenizer:
         self.current = c - 1
         return token
 
+    def string(self) -> "Token":
+        c = self.current + 1
+        while self.source[c] != '"':
+            c += 1
+        token = Token(TokenKind.STRING, self.source[self.current + 1 : c - 1])
+        self.current = c
+        return token
+
     def lookahead(self, thing: str) -> bool:
         if self.source[self.current + 1 : self.current + len(thing) + 1] == thing:
             self.current += len(thing)
@@ -178,6 +186,8 @@ class Tokenizer:
                     tokens.append(Token(TokenKind.COMMA, ","))
                 case v if v == "<":
                     tokens.append(Token(TokenKind.LT, "<"))
+                case v if v == '"':
+                    tokens.append(self.string())
                 case _:
                     raise Exception("Unknown token.")
             self.current += 1
@@ -244,3 +254,4 @@ class TokenKind(enum.Enum):
     BANGEQUAL = enum.auto()
     TRUE = enum.auto()
     FALSE = enum.auto()
+    STRING = enum.auto()
