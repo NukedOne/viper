@@ -14,10 +14,12 @@ class Expression(ABC):
 
 
 class LiteralExpression(Expression):
-    def __init__(self, expr: float) -> None:
+    def __init__(self, expr: int | float | str) -> None:
         self.expr = expr
 
     def __repr__(self) -> str:
+        if isinstance(self.expr, float):
+            return "%.16g" % self.expr
         return str(self.expr)
 
     def eval(self, interpreter: "Interpreter") -> t.Any:
@@ -206,11 +208,20 @@ class PrefixParselet(ABC):
 class LiteralParselet(PrefixParselet):
     def parse(self, parser: "Parser", token: Token) -> Expression:
         match token:
-            case t if t.value in {"true", "false"}:
-                return LiteralExpression(True if t.value == "true" else False)
-            case t if t.kind == TokenKind.NUMBER:
-                return LiteralExpression(float(token.value))
-            case t if t.kind == TokenKind.STRING:
+            case l if l.value in {"true", "false"}:
+                return LiteralExpression(True if l.value == "true" else False)
+            case l if l.kind == TokenKind.NUMBER:
+                num: t.Optional[int | float] = None
+                try:
+                    num = int(token.value)
+                except ValueError:
+                    try:
+                        num = float(token.value)
+                    except ValueError:
+                        raise ValueError("Invalid int/float")
+                assert num is not None
+                return LiteralExpression(num)
+            case l if l.kind == TokenKind.STRING:
                 return LiteralExpression(token.value)
             case _:
                 raise NotImplementedError(f"Couldn't parse: {token.value}")
@@ -306,7 +317,10 @@ class PrintStatement(Statement):
 
     def exec(self, interpreter: "Interpreter") -> t.Any:
         expr = self.expr.eval(interpreter)
-        print(expr)
+        if isinstance(expr, float):
+            print("%.16g" % expr)
+        else:
+            print(expr)
 
 
 class IfStatement(Statement):
@@ -408,23 +422,23 @@ class Parser:
     tokens: list[Token]
     precedence: dict[TokenKind, int] = {
         TokenKind.EQUAL: 1,
-        TokenKind.PLUSEQUAL: 1,
-        TokenKind.MINUSEQUAL: 1,
-        TokenKind.STAREQUAL: 1,
-        TokenKind.SLASHEQUAL: 1,
-        TokenKind.SHLEQUAL: 1,
-        TokenKind.SHREQUAL: 1,
-        TokenKind.BITANDEQUAL: 1,
-        TokenKind.BITOREQUAL: 1,
-        TokenKind.BITXOREQUAL: 1,
-        TokenKind.MODEQUAL: 1,
+        TokenKind.PLUS_EQUAL: 1,
+        TokenKind.MINUS_EQUAL: 1,
+        TokenKind.STAR_EQUAL: 1,
+        TokenKind.SLASH_EQUAL: 1,
+        TokenKind.SHL_EQUAL: 1,
+        TokenKind.SHR_EQUAL: 1,
+        TokenKind.BITAND_EQUAL: 1,
+        TokenKind.BITOR_EQUAL: 1,
+        TokenKind.BITXOR_EQUAL: 1,
+        TokenKind.MOD_EQUAL: 1,
         TokenKind.OR: 2,
         TokenKind.AND: 3,
         TokenKind.BITOR: 4,
         TokenKind.BITXOR: 5,
         TokenKind.BITAND: 6,
         TokenKind.DOUBLE_EQUAL: 7,
-        TokenKind.BANGEQUAL: 7,
+        TokenKind.BANG_EQUAL: 7,
         TokenKind.LT: 8,
         TokenKind.LTE: 8,
         TokenKind.GT: 8,
@@ -443,32 +457,39 @@ class Parser:
 
     def __init__(self, tokens: list[Token]) -> None:
         self.tokens = tokens
-        self.register(TokenKind.PLUS, BinaryOperatorParselet())
-        self.register(TokenKind.MINUS, BinaryOperatorParselet())
-        self.register(TokenKind.STAR, BinaryOperatorParselet())
-        self.register(TokenKind.SLASH, BinaryOperatorParselet())
-        self.register(TokenKind.EQUAL, BinaryOperatorParselet())
-        self.register(TokenKind.DOUBLE_EQUAL, BinaryOperatorParselet())
-        self.register(TokenKind.BANGEQUAL, BinaryOperatorParselet())
-        self.register(TokenKind.PLUSEQUAL, BinaryOperatorParselet())
-        self.register(TokenKind.MINUSEQUAL, BinaryOperatorParselet())
-        self.register(TokenKind.STAREQUAL, BinaryOperatorParselet())
-        self.register(TokenKind.SLASHEQUAL, BinaryOperatorParselet())
-        self.register(TokenKind.BITANDEQUAL, BinaryOperatorParselet())
-        self.register(TokenKind.BITXOREQUAL, BinaryOperatorParselet())
-        self.register(TokenKind.BITOREQUAL, BinaryOperatorParselet())
-        self.register(TokenKind.BITOR, BinaryOperatorParselet())
-        self.register(TokenKind.BITAND, BinaryOperatorParselet())
-        self.register(TokenKind.BITXOR, BinaryOperatorParselet())
-        self.register(TokenKind.SHL, BinaryOperatorParselet())
-        self.register(TokenKind.SHR, BinaryOperatorParselet())
-        self.register(TokenKind.SHLEQUAL, BinaryOperatorParselet())
-        self.register(TokenKind.SHREQUAL, BinaryOperatorParselet())
-        self.register(TokenKind.MODEQUAL, BinaryOperatorParselet())
-        self.register(TokenKind.MOD, BinaryOperatorParselet())
-        self.register(TokenKind.AND, BinaryOperatorParselet())
-        self.register(TokenKind.OR, BinaryOperatorParselet())
-        self.register(TokenKind.LT, BinaryOperatorParselet())
+        for kind in (
+            TokenKind.PLUS,
+            TokenKind.MINUS,
+            TokenKind.STAR,
+            TokenKind.SLASH,
+            TokenKind.MOD,
+            TokenKind.DOUBLE_EQUAL,
+            TokenKind.BANG_EQUAL,
+            TokenKind.EQUAL,
+            TokenKind.PLUS_EQUAL,
+            TokenKind.MINUS_EQUAL,
+            TokenKind.STAR_EQUAL,
+            TokenKind.SLASH_EQUAL,
+            TokenKind.BITAND_EQUAL,
+            TokenKind.BITXOR_EQUAL,
+            TokenKind.BITOR_EQUAL,
+            TokenKind.SHL_EQUAL,
+            TokenKind.SHR_EQUAL,
+            TokenKind.MOD_EQUAL,
+            TokenKind.BITOR,
+            TokenKind.BITAND,
+            TokenKind.BITXOR,
+            TokenKind.SHL,
+            TokenKind.SHR,
+            TokenKind.AND,
+            TokenKind.OR,
+            TokenKind.LT,
+            TokenKind.GT,
+            TokenKind.GTE,
+            TokenKind.LTE,
+        ):
+            self.register(kind, BinaryOperatorParselet())
+
         self.register(TokenKind.LPAREN, CallParselet())
         self.register(TokenKind.NUMBER, LiteralParselet())
         self.register(TokenKind.TRUE, LiteralParselet())
