@@ -205,14 +205,13 @@ class PrefixParselet(ABC):
 
 class LiteralParselet(PrefixParselet):
     def parse(self, parser: "Parser", token: Token) -> Expression:
-        match token.value:
-            case v if v in {"true", "false"}:
+        match token:
+            case t if t.value in {"true", "false"}:
                 return LiteralExpression(True if v == "true" else False)
+            case t if t.kind == TokenKind.NUMBER:
+                return LiteralExpression(float(token.value))
             case _:
-                try:
-                    return LiteralExpression(float(token.value))
-                except ValueError:
-                    raise NotImplementedError(f"Couldn't parse: {token.value}")
+                raise NotImplementedError(f"Couldn't parse: {token.value}")
 
 
 class NameParselet(PrefixParselet):
