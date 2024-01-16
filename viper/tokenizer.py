@@ -50,6 +50,8 @@ class Tokenizer:
                         tokens.append(Token(TokenKind.FN, "fn"))
                     elif self.lookahead("or"):
                         tokens.append(Token(TokenKind.FOR, "for"))
+                    elif self.lookahead("alse"):
+                        tokens.append(Token(TokenKind.FALSE, "false"))
                     else:
                         tokens.append(self.identifier())
                 case v if v == "e":
@@ -70,6 +72,11 @@ class Tokenizer:
                 case v if v == "r":
                     if self.lookahead("eturn"):
                         tokens.append(Token(TokenKind.RETURN, "return"))
+                    else:
+                        tokens.append(self.identifier())
+                case v if v == "t":
+                    if self.lookahead("rue"):
+                        tokens.append(Token(TokenKind.TRUE, "true"))
                     else:
                         tokens.append(self.identifier())
                 case v if v == "w":
@@ -225,3 +232,5 @@ class TokenKind(enum.Enum):
     DOUBLE_EQUAL = enum.auto()
     BANG = enum.auto()
     BANGEQUAL = enum.auto()
+    TRUE = enum.auto()
+    FALSE = enum.auto()

@@ -1,62 +1,16 @@
-import enum
 from dataclasses import dataclass
 import typing as t
 from viper.tokenizer import Token, TokenKind
 from abc import ABC, abstractmethod
 
+
 if t.TYPE_CHECKING:
-    Interpreter = t.Any
+    from viper.interpreter import Interpreter
 
 
 class Expression(ABC):
     def eval(self, interpreter: "Interpreter") -> t.Any:
         pass
-
-
-class BinaryExpressionKind(enum.Enum):
-    ADD = enum.auto()
-    SUB = enum.auto()
-    MUL = enum.auto()
-    DIV = enum.auto()
-    MOD = enum.auto()
-    BITAND = enum.auto()
-    BITOR = enum.auto()
-    BITXOR = enum.auto()
-    SHL = enum.auto()
-    SHR = enum.auto()
-    LT = enum.auto()
-    GT = enum.auto()
-    LTE = enum.auto()
-    GTE = enum.auto()
-    EQUALITY = enum.auto()
-    NON_EQUALITY = enum.auto()
-    AND = enum.auto()
-    OR = enum.auto()
-    ASSIGN = enum.auto()
-
-
-class CallExpression(Expression):
-    def __init__(self, callee: Expression, args: list[Expression]) -> None:
-        self.callee = callee
-        self.args = args
-
-    def __repr__(self) -> str:
-        return f"{self.callee}({self.args})"
-
-    def eval(self, interpreter: "Interpreter") -> t.Any:
-        assert isinstance(self.callee, VariableExpression)
-        f = interpreter.functions[self.callee.name]
-        old_locals = interpreter.locals
-        interpreter.locals = {
-            k: v.eval(interpreter)
-            for k, v in zip(
-                [arg.name for arg in f.arguments],  # type: ignore
-                self.args,
-            )
-        }
-        retval = f.body.exec(interpreter)
-        interpreter.locals = old_locals
-        return retval
 
 
 class LiteralExpression(Expression):
@@ -82,87 +36,47 @@ class VariableExpression(Expression):
 
 
 class BinaryExpression(Expression):
-    def __init__(
-        self, kind: BinaryExpressionKind, lhs: Expression, rhs: Expression
-    ) -> None:
+    def __init__(self, lhs: Expression, rhs: Expression, operator: str) -> None:
         self.lhs = lhs
         self.rhs = rhs
-        self.kind = kind
+        self.operator = operator
 
     def __repr__(self) -> str:
-        match self.kind:
-            case v if v == BinaryExpressionKind.ADD:
-                return f"({self.lhs} + {self.rhs})"
-            case v if v == BinaryExpressionKind.SUB:
-                return f"({self.lhs} - {self.rhs})"
-            case v if v == BinaryExpressionKind.MUL:
-                return f"({self.lhs} * {self.rhs})"
-            case v if v == BinaryExpressionKind.DIV:
-                return f"({self.lhs} / {self.rhs})"
-            case v if v == BinaryExpressionKind.MOD:
-                return f"({self.lhs} % {self.rhs})"
-            case v if v == BinaryExpressionKind.BITAND:
-                return f"({self.lhs} & {self.rhs})"
-            case v if v == BinaryExpressionKind.BITOR:
-                return f"({self.lhs} | {self.rhs})"
-            case v if v == BinaryExpressionKind.BITXOR:
-                return f"({self.lhs} ^ {self.rhs})"
-            case v if v == BinaryExpressionKind.SHL:
-                return f"({self.lhs} << {self.rhs})"
-            case v if v == BinaryExpressionKind.SHR:
-                return f"({self.lhs} >> {self.rhs})"
-            case v if v == BinaryExpressionKind.LT:
-                return f"({self.lhs} < {self.rhs})"
-            case v if v == BinaryExpressionKind.GT:
-                return f"({self.lhs} > {self.rhs})"
-            case v if v == BinaryExpressionKind.LTE:
-                return f"({self.lhs} <= {self.rhs})"
-            case v if v == BinaryExpressionKind.GTE:
-                return f"({self.lhs} >= {self.rhs})"
-            case v if v == BinaryExpressionKind.EQUALITY:
-                return f"({self.lhs} == {self.rhs})"
-            case v if v == BinaryExpressionKind.NON_EQUALITY:
-                return f"({self.lhs} != {self.rhs})"
-            case v if v == BinaryExpressionKind.AND:
-                return f"({self.lhs} && {self.rhs})"
-            case v if v == BinaryExpressionKind.OR:
-                return f"({self.lhs} || {self.rhs})"
-            case _:
-                raise Exception("Unknown expression kind.")
+        return f"({self.lhs} {self.operator} {self.rhs})"
 
     def eval(self, interpreter: "Interpreter") -> t.Any:
-        match self.kind:
-            case v if v == BinaryExpressionKind.ADD:
+        match self.operator:
+            case v if v == "+":
                 return self.lhs.eval(interpreter) + self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.SUB:
+            case v if v == "-":
                 return self.lhs.eval(interpreter) - self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.MUL:
+            case v if v == "*":
                 return self.lhs.eval(interpreter) * self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.DIV:
+            case v if v == "/":
                 return self.lhs.eval(interpreter) / self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.MOD:
+            case v if v == "%":
                 return self.lhs.eval(interpreter) % self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.BITAND:
+            case v if v == "&":
                 return self.lhs.eval(interpreter) & self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.BITOR:
+            case v if v == "|":
                 return self.lhs.eval(interpreter) | self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.BITXOR:
+            case v if v == "^":
                 return self.lhs.eval(interpreter) ^ self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.LT:
+            case v if v == "<":
                 return self.lhs.eval(interpreter) < self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.GT:
+            case v if v == ">":
                 return self.lhs.eval(interpreter) > self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.LTE:
+            case v if v == "<=":
                 return self.lhs.eval(interpreter) <= self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.GTE:
+            case v if v == ">=":
                 return self.lhs.eval(interpreter) >= self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.AND:
+            case v if v == "&&":
                 return self.lhs.eval(interpreter) and self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.OR:
+            case v if v == "||":
                 return self.lhs.eval(interpreter) or self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.EQUALITY:
+            case v if v == "==":
                 return self.lhs.eval(interpreter) == self.rhs.eval(interpreter)
-            case v if v == BinaryExpressionKind.NON_EQUALITY:
+            case v if v == "!=":
                 return self.lhs.eval(interpreter) != self.rhs.eval(interpreter)
 
 
@@ -233,6 +147,139 @@ class AssignExpression(Expression):
                     interpreter.locals[self.lhs.name] ^= self.rhs.eval(interpreter)
                 else:
                     interpreter.globals[self.lhs.name] ^= self.rhs.eval(interpreter)
+
+
+class CallExpression(Expression):
+    def __init__(self, callee: Expression, args: list[Expression]) -> None:
+        self.callee = callee
+        self.args = args
+
+    def __repr__(self) -> str:
+        return f"{self.callee}({self.args})"
+
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        assert isinstance(self.callee, VariableExpression)
+        f = interpreter.functions[self.callee.name]
+        old_locals = interpreter.locals
+        interpreter.locals = {
+            k: v.eval(interpreter)
+            for k, v in zip(
+                [arg.name for arg in f.arguments],  # type: ignore
+                self.args,
+            )
+        }
+        retval = f.body.exec(interpreter)
+        interpreter.locals = old_locals
+        return retval
+
+
+class UnaryExpression(Expression):
+    def __init__(self, expr: Expression, operator: str) -> None:
+        self.expr = expr
+        self.operator = operator
+
+    def __repr__(self) -> str:
+        return f"({self.operator}({self.expr}))"
+
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        match self.operator:
+            case "!":
+                return not self.expr.eval(interpreter)
+            case "-":
+                return -self.expr.eval(interpreter)
+            case _:
+                raise NotImplementedError()
+
+
+@dataclass
+class PrefixExpression:
+    token: Token
+    operand: Expression
+
+
+class PrefixParselet(ABC):
+    @abstractmethod
+    def parse(self, parser: "Parser", token: Token) -> Expression:
+        pass
+
+
+class LiteralParselet(PrefixParselet):
+    def parse(self, parser: "Parser", token: Token) -> Expression:
+        match token.value:
+            case v if v.isdigit():
+                return LiteralExpression(float(v))
+            case v if v in {"true", "false"}:
+                return LiteralExpression(True if v == "true" else False)
+
+
+class NameParselet(PrefixParselet):
+    def parse(self, parser: "Parser", token: Token) -> Expression:
+        return VariableExpression(token.value)
+
+
+class UnaryParselet(PrefixParselet):
+    def parse(self, parser: "Parser", token: Token) -> Expression:
+        expr = parser.parse_expression(0)
+        return UnaryExpression(expr, token.value)
+
+
+class InfixParselet(ABC):
+    @abstractmethod
+    def parse(self, parser: "Parser", left: Expression, token: Token) -> Expression:
+        pass
+
+
+class CallParselet(InfixParselet):
+    def parse(self, parser: "Parser", left: Expression, token: Token) -> Expression:
+        args = []
+        if not parser.match([TokenKind.RPAREN]):
+            while True:
+                args.append(parser.parse_expression(0))
+                if not parser.match([TokenKind.COMMA]):
+                    break
+            parser.consume(TokenKind.RPAREN)
+        return CallExpression(left, args)
+
+
+class BinaryOperatorParselet(InfixParselet):
+    def parse(self, parser: "Parser", left: Expression, token: Token) -> Expression:
+        right = parser.parse_expression(parser.precedence[token.kind])
+        match token.value:
+            case (
+                "+"
+                | "-"
+                | "*"
+                | "/"
+                | "%"
+                | "&"
+                | "|"
+                | "^"
+                | "<"
+                | ">"
+                | ">="
+                | "<="
+                | "=="
+                | "!="
+                | "||"
+                | "&&"
+            ):
+                return BinaryExpression(left, right, token.value)
+            case (
+                "="
+                | "+="
+                | "-="
+                | "*="
+                | "/="
+                | "%="
+                | "&="
+                | "|="
+                | "^="
+                | ">>="
+                | "<<="
+            ):
+                return AssignExpression(left, right, token.value)
+            case _:
+                raise Exception("Unknown operator.")
 
 
 class Statement(ABC):
@@ -351,108 +398,6 @@ class ExpressionStatement(Statement):
         self.expr.eval(interpreter)
 
 
-@dataclass
-class PrefixExpression:
-    token: Token
-    operand: Expression
-
-
-class PrefixParselet(ABC):
-    @abstractmethod
-    def parse(self, parser: "Parser", token: Token) -> Expression:
-        pass
-
-
-class NumberParselet(PrefixParselet):
-    def parse(self, parser: "Parser", token: Token) -> Expression:
-        return LiteralExpression(float(token.value))
-
-
-class NameParselet(PrefixParselet):
-    def parse(self, parser: "Parser", token: Token) -> Expression:
-        return VariableExpression(token.value)
-
-
-class InfixParselet(ABC):
-    @abstractmethod
-    def parse(self, parser: "Parser", left: Expression, token: Token) -> Expression:
-        pass
-
-
-class CallParselet(InfixParselet):
-    def parse(self, parser: "Parser", left: Expression, token: Token) -> Expression:
-        args = []
-        if not parser.match([TokenKind.RPAREN]):
-            while True:
-                args.append(parser.parse_expression(0))
-                if not parser.match([TokenKind.COMMA]):
-                    break
-            parser.consume(TokenKind.RPAREN)
-        return CallExpression(left, args)
-
-
-class BinaryOperatorParselet(InfixParselet):
-    def parse(self, parser: "Parser", left: Expression, token: Token) -> Expression:
-        right = parser.parse_expression(parser.precedence[token.kind])
-        match token.value:
-            case "+":
-                return BinaryExpression(BinaryExpressionKind.ADD, left, right)
-            case "-":
-                return BinaryExpression(BinaryExpressionKind.SUB, left, right)
-            case "*":
-                return BinaryExpression(BinaryExpressionKind.MUL, left, right)
-            case "/":
-                return BinaryExpression(BinaryExpressionKind.DIV, left, right)
-            case "%":
-                return BinaryExpression(BinaryExpressionKind.MOD, left, right)
-            case "&":
-                return BinaryExpression(BinaryExpressionKind.BITAND, left, right)
-            case "|":
-                return BinaryExpression(BinaryExpressionKind.BITOR, left, right)
-            case "^":
-                return BinaryExpression(BinaryExpressionKind.BITXOR, left, right)
-            case "<":
-                return BinaryExpression(BinaryExpressionKind.LT, left, right)
-            case ">":
-                return BinaryExpression(BinaryExpressionKind.GT, left, right)
-            case ">=":
-                return BinaryExpression(BinaryExpressionKind.GTE, left, right)
-            case "<=":
-                return BinaryExpression(BinaryExpressionKind.LTE, left, right)
-            case "==":
-                return BinaryExpression(BinaryExpressionKind.EQUALITY, left, right)
-            case "!=":
-                return BinaryExpression(BinaryExpressionKind.NON_EQUALITY, left, right)
-            case "||":
-                return BinaryExpression(BinaryExpressionKind.OR, left, right)
-            case "&&":
-                return BinaryExpression(BinaryExpressionKind.AND, left, right)
-            case "=":
-                return AssignExpression(left, right, token.value)
-            case "+=":
-                return AssignExpression(left, right, token.value)
-            case "-=":
-                return AssignExpression(left, right, token.value)
-            case "*=":
-                return AssignExpression(left, right, token.value)
-            case "/=":
-                return AssignExpression(left, right, token.value)
-            case "%=":
-                return AssignExpression(left, right, token.value)
-            case "&=":
-                return AssignExpression(left, right, token.value)
-            case "|=":
-                return AssignExpression(left, right, token.value)
-            case "^=":
-                return AssignExpression(left, right, token.value)
-            case ">>=":
-                return AssignExpression(left, right, token.value)
-            case "<<=":
-                return AssignExpression(left, right, token.value)
-            case _:
-                raise Exception("Unknown operator.")
-
-
 class Parser:
     prefix_parselets: dict[TokenKind, PrefixParselet] = {}
     infix_parselets: dict[TokenKind, InfixParselet] = {}
@@ -521,8 +466,12 @@ class Parser:
         self.register(TokenKind.OR, BinaryOperatorParselet())
         self.register(TokenKind.LT, BinaryOperatorParselet())
         self.register(TokenKind.LPAREN, CallParselet())
-        self.register(TokenKind.NUMBER, NumberParselet())
+        self.register(TokenKind.NUMBER, LiteralParselet())
+        self.register(TokenKind.TRUE, LiteralParselet())
+        self.register(TokenKind.FALSE, LiteralParselet())
         self.register(TokenKind.IDENTIFIER, NameParselet())
+        self.register(TokenKind.BANG, UnaryParselet())
+        self.register(TokenKind.MINUS, UnaryParselet())
 
     def register(
         self, kind: TokenKind, parselet: PrefixParselet | InfixParselet
