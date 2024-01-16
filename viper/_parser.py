@@ -207,7 +207,7 @@ class LiteralParselet(PrefixParselet):
     def parse(self, parser: "Parser", token: Token) -> Expression:
         match token:
             case t if t.value in {"true", "false"}:
-                return LiteralExpression(True if v == "true" else False)
+                return LiteralExpression(True if t.value == "true" else False)
             case t if t.kind == TokenKind.NUMBER:
                 return LiteralExpression(float(token.value))
             case _:
