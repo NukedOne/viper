@@ -1,0 +1,6 @@
+fn main() {
+    let x = "Hello, world!";
+    print x;
+    return 0;
+}
+main();

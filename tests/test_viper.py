@@ -5,6 +5,7 @@ ASSERTIONS = {
     "while_local": [0, 1, 2, 3, 4],
     "global_local": [3],
     "fib": [55],
+    "string": ["Hello, world!"],
 }
 
 

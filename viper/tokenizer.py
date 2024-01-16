@@ -41,7 +41,7 @@ class Tokenizer:
         c = self.current + 1
         while self.source[c] != '"':
             c += 1
-        token = Token(TokenKind.STRING, self.source[self.current + 1 : c - 1])
+        token = Token(TokenKind.STRING, self.source[self.current + 1 : c])
         self.current = c
         return token
 
