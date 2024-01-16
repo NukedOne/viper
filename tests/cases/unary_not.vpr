@@ -1,0 +1,10 @@
+fn main() {
+    let x = true;
+    if (!x) {
+        print 1;
+    } else {
+        print 2;
+    }
+    return 0;
+}
+main();

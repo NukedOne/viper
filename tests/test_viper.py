@@ -6,6 +6,8 @@ ASSERTIONS = {
     "global_local": [3],
     "fib": [55],
     "string": ["Hello, world!"],
+    "unary_not": [2],
+    "float": [3.14],
 }
 
 
@@ -101,3 +103,41 @@ def test_arithmetic_operators(capsys, tmp_path):
         expected = eval(f"1 {op} 2")
 
         assert ("%.16g" % expected) in output
+
+
+def test_logical_operators(capsys):
+    import textwrap
+
+    from viper.tokenizer import Tokenizer
+    from viper._parser import Parser
+    from viper.interpreter import Interpreter
+
+    for op, expected in zip(("||", "&&"), (1, 2)):
+        source = textwrap.dedent(
+            """
+            fn main() {
+                let x = 3;
+                let y = 4;
+                if (x == 3 %s y != 4) {
+                    print 1;
+                } else {
+                    print 2;
+                }
+                return 0;
+            }
+            main();
+            """
+            % op
+        )
+
+        tokenizer = Tokenizer(source)
+        tokens = tokenizer.tokenize()
+        parser = Parser(tokens)
+        ast = parser.parse()
+        interpreter = Interpreter({}, {}, {})
+        interpreter._exec(ast)
+
+        captured = capsys.readouterr()
+        output = captured.out.strip().split("\n")
+
+        assert str(expected) in output
