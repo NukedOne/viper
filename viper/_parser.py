@@ -211,16 +211,17 @@ class CallExpression(Expression):
             assert isinstance(self.callee, GetExpression)
             method = self.callee.eval(interpreter)
             old_locals = interpreter.locals
-            interpreter.locals = {"self": self.callee.gotten.eval(interpreter)}
-            interpreter.locals.update(
+            new_locals = {"self": self.callee.gotten.eval(interpreter)}
+            new_locals.update(
                 {
                     k: v.eval(interpreter)
                     for k, v in zip(
-                        [arg.name for arg in method.arguments],  # type: ignore
+                        [arg.name for arg in method.arguments if arg.name != "self"],  # type: ignore
                         self.args,
                     )
                 }
             )
+            interpreter.locals = new_locals
             retval = method.body.exec(interpreter)
             interpreter.locals = old_locals
             return retval
