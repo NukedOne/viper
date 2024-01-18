@@ -8,13 +8,22 @@ if t.TYPE_CHECKING:
     from viper.interpreter import Interpreter
 
 
+class StructLiteralExpression:
+    def __init__(self, name: Token, fields: dict[Token, "Expression"]) -> None:
+        self.name = name
+        self.fields = fields
+
+    def __repr__(self) -> str:
+        return f"{self.name.value} {{ {self.fields} }}"
+
+
 class Expression(ABC):
     def eval(self, interpreter: "Interpreter") -> t.Any:
         pass
 
 
 class LiteralExpression(Expression):
-    def __init__(self, expr: int | float | str) -> None:
+    def __init__(self, expr: int | float | str | StructLiteralExpression) -> None:
         self.expr = expr
 
     def __repr__(self) -> str:
@@ -23,6 +32,16 @@ class LiteralExpression(Expression):
         return str(self.expr)
 
     def eval(self, interpreter: "Interpreter") -> t.Any:
+        if isinstance(self.expr, StructLiteralExpression):
+            assert isinstance(self.expr, StructLiteralExpression)
+            methods = {
+                k: v
+                for k, v in interpreter.structs[self.expr.name.value].fields.items()
+                if isinstance(v, FnStatement)
+            }
+            for method_name, method in methods.items():
+                assert isinstance(method, FnStatement)
+                self.expr.fields[method_name] = method
         return self.expr
 
 
@@ -48,7 +67,7 @@ class BinaryExpression(Expression):
 
     def eval(self, interpreter: "Interpreter") -> t.Any:
         match self.operator:
-            case v if v == "+":
+            case v if v in "+":
                 return self.lhs.eval(interpreter) + self.rhs.eval(interpreter)
             case v if v == "-":
                 return self.lhs.eval(interpreter) - self.rhs.eval(interpreter)
@@ -80,6 +99,8 @@ class BinaryExpression(Expression):
                 return self.lhs.eval(interpreter) == self.rhs.eval(interpreter)
             case v if v == "!=":
                 return self.lhs.eval(interpreter) != self.rhs.eval(interpreter)
+            case v if v in "++":
+                return str(self.lhs.eval(interpreter)) + str(self.rhs.eval(interpreter))
 
 
 class AssignExpression(Expression):
@@ -151,6 +172,18 @@ class AssignExpression(Expression):
                     interpreter.globals[self.lhs.name] ^= self.rhs.eval(interpreter)
 
 
+class GetExpression(Expression):
+    def __init__(self, gotten: Expression, member: str) -> None:
+        self.gotten = gotten
+        self.member = member
+
+    def __repr__(self) -> str:
+        return f"({self.gotten}.{self.member})"
+
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        return self.gotten.eval(interpreter).fields[self.member.value]
+
+
 class CallExpression(Expression):
     def __init__(self, callee: Expression, args: list[Expression]) -> None:
         self.callee = callee
@@ -160,19 +193,37 @@ class CallExpression(Expression):
         return f"{self.callee}({self.args})"
 
     def eval(self, interpreter: "Interpreter") -> t.Any:
-        assert isinstance(self.callee, VariableExpression)
-        f = interpreter.functions[self.callee.name]
-        old_locals = interpreter.locals
-        interpreter.locals = {
-            k: v.eval(interpreter)
-            for k, v in zip(
-                [arg.name for arg in f.arguments],  # type: ignore
-                self.args,
+        if isinstance(self.callee, VariableExpression):
+            assert isinstance(self.callee, VariableExpression)
+            f = interpreter.functions[self.callee.name]
+            old_locals = interpreter.locals
+            interpreter.locals = {
+                k: v.eval(interpreter)
+                for k, v in zip(
+                    [arg.name for arg in f.arguments],  # type: ignore
+                    self.args,
+                )
+            }
+            retval = f.body.exec(interpreter)
+            interpreter.locals = old_locals
+            return retval
+        elif isinstance(self.callee, GetExpression):
+            assert isinstance(self.callee, GetExpression)
+            method = self.callee.eval(interpreter)
+            old_locals = interpreter.locals
+            interpreter.locals = {"self": self.callee.gotten.eval(interpreter)}
+            interpreter.locals.update(
+                {
+                    k: v.eval(interpreter)
+                    for k, v in zip(
+                        [arg.name for arg in method.arguments],  # type: ignore
+                        self.args,
+                    )
+                }
             )
-        }
-        retval = f.body.exec(interpreter)
-        interpreter.locals = old_locals
-        return retval
+            retval = method.body.exec(interpreter)
+            interpreter.locals = old_locals
+            return retval
 
 
 class UnaryExpression(Expression):
@@ -223,6 +274,17 @@ class LiteralParselet(PrefixParselet):
                 return LiteralExpression(num)
             case l if l.kind == TokenKind.STRING:
                 return LiteralExpression(token.value)
+            case l if l.kind == TokenKind.STRUCT:
+                name = parser.consume(TokenKind.IDENTIFIER)
+                parser.consume(TokenKind.LBRACE)
+                fields = {}
+                while not parser.match([TokenKind.RBRACE]):
+                    field_name = parser.consume(TokenKind.IDENTIFIER)
+                    parser.consume(TokenKind.COLON)
+                    field_value = parser.parse_expression(0)
+                    fields[field_name.value] = field_value
+                    parser.consume(TokenKind.COMMA)
+                return LiteralExpression(StructLiteralExpression(name, fields))
             case _:
                 raise NotImplementedError(f"Couldn't parse: {token.value}")
 
@@ -246,14 +308,18 @@ class InfixParselet(ABC):
 
 class CallParselet(InfixParselet):
     def parse(self, parser: "Parser", left: Expression, token: Token) -> Expression:
-        args = []
-        if not parser.match([TokenKind.RPAREN]):
-            while True:
-                args.append(parser.parse_expression(0))
-                if not parser.match([TokenKind.COMMA]):
-                    break
-            parser.consume(TokenKind.RPAREN)
-        return CallExpression(left, args)
+        if token.kind == TokenKind.LPAREN:
+            args = []
+            if not parser.match([TokenKind.RPAREN]):
+                while True:
+                    args.append(parser.parse_expression(0))
+                    if not parser.match([TokenKind.COMMA]):
+                        break
+                parser.consume(TokenKind.RPAREN)
+            return CallExpression(left, args)
+        elif token.kind == TokenKind.DOT:
+            member = parser.consume(TokenKind.IDENTIFIER)
+            return GetExpression(left, member)
 
 
 class BinaryOperatorParselet(InfixParselet):
@@ -277,6 +343,7 @@ class BinaryOperatorParselet(InfixParselet):
                 | "!="
                 | "||"
                 | "&&"
+                | "++"
             ):
                 return BinaryExpression(left, right, token.value)
             case (
@@ -416,6 +483,32 @@ class ExpressionStatement(Statement):
         self.expr.eval(interpreter)
 
 
+class StructStatement(Statement):
+    def __init__(self, name: Token, fields: dict[str, Expression | Statement]) -> None:
+        self.name = name
+        self.fields = fields
+
+    def __repr__(self) -> str:
+        return f"Struct(name={self.name.value}, fields={self.fields})"
+
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        interpreter.structs[self.name.value] = self
+
+
+class ImplStatement(Statement):
+    def __init__(self, name: Token, methods: list[Statement]) -> None:
+        self.name = name
+        self.methods = methods
+
+    def __repr__(self) -> str:
+        return f"Impl(name={self.name.value}, methods={self.methods})"
+
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        for method in self.methods:
+            assert isinstance(method, FnStatement)
+            interpreter.structs[self.name.value].fields[method.name] = method
+
+
 class Parser:
     prefix_parselets: dict[TokenKind, PrefixParselet] = {}
     infix_parselets: dict[TokenKind, InfixParselet] = {}
@@ -450,7 +543,9 @@ class Parser:
         TokenKind.STAR: 11,
         TokenKind.SLASH: 11,
         TokenKind.MOD: 11,
+        TokenKind.PLUS_PLUS: 11,
         TokenKind.BANG: 12,
+        TokenKind.DOT: 13,
         TokenKind.LPAREN: 13,
         TokenKind.NUMBER: 14,
     }
@@ -463,6 +558,7 @@ class Parser:
             TokenKind.STAR,
             TokenKind.SLASH,
             TokenKind.MOD,
+            TokenKind.PLUS_PLUS,
             TokenKind.DOUBLE_EQUAL,
             TokenKind.BANG_EQUAL,
             TokenKind.EQUAL,
@@ -491,11 +587,13 @@ class Parser:
             self.register(kind, BinaryOperatorParselet())
 
         self.register(TokenKind.LPAREN, CallParselet())
+        self.register(TokenKind.DOT, CallParselet())
         self.register(TokenKind.NUMBER, LiteralParselet())
         self.register(TokenKind.TRUE, LiteralParselet())
         self.register(TokenKind.FALSE, LiteralParselet())
         self.register(TokenKind.STRING, LiteralParselet())
         self.register(TokenKind.IDENTIFIER, NameParselet())
+        self.register(TokenKind.STRUCT, LiteralParselet())
         self.register(TokenKind.BANG, UnaryParselet())
         self.register(TokenKind.MINUS, UnaryParselet())
 
@@ -611,6 +709,24 @@ class Parser:
         self.consume(TokenKind.SEMICOLON)
         return ExpressionStatement(expr)
 
+    def parse_struct_statement(self) -> Statement:
+        name = self.consume(TokenKind.IDENTIFIER)
+        self.consume(TokenKind.LBRACE)
+        fields = {}
+        while not self.match([TokenKind.RBRACE]):
+            field_name = self.consume(TokenKind.IDENTIFIER)
+            fields[field_name.value] = None
+            self.consume(TokenKind.SEMICOLON)
+        return StructStatement(name, fields)
+
+    def parse_impl_statement(self) -> Statement:
+        name = self.consume(TokenKind.IDENTIFIER)
+        self.consume(TokenKind.LBRACE)
+        methods = []
+        while not self.match([TokenKind.RBRACE]):
+            methods.append(self.parse_statement())
+        return ImplStatement(name, methods)
+
     def parse_statement(self) -> Statement:
         if self.match([TokenKind.LET]):
             return self.parse_let_statement()
@@ -626,6 +742,10 @@ class Parser:
             return self.parse_if_statement()
         elif self.match([TokenKind.RETURN]):
             return self.parse_return_statement()
+        elif self.match([TokenKind.STRUCT]):
+            return self.parse_struct_statement()
+        elif self.match([TokenKind.IMPL]):
+            return self.parse_impl_statement()
         elif self.match([TokenKind.LBRACE]):
             return self.parse_block_statement()
         else:

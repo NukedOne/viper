@@ -1,0 +1,23 @@
+struct person {
+    name;
+}
+
+impl person {
+    fn say(self) {
+        self.do_say();
+        return 0;
+    }
+
+    fn do_say(self) {
+        print "Hello, " ++ self.name ++ ".";
+        return 0;
+    }
+}
+
+fn main() {
+    let p = struct person { name: "John", };
+    p.say();
+    return 0;
+}
+
+main();

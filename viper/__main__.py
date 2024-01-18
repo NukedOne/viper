@@ -11,7 +11,7 @@ def main() -> None:
     tokens = tokenizer.tokenize()
     parser = Parser(tokens)
     ast = parser.parse()
-    interpreter = Interpreter({}, {}, {})
+    interpreter = Interpreter({}, {}, {}, {})
     interpreter._exec(ast)
 
 

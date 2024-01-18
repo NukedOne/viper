@@ -1,6 +1,6 @@
 import typing as t
 
-from viper._parser import FnStatement
+from viper._parser import FnStatement, StructStatement
 
 
 class Interpreter:
@@ -9,11 +9,13 @@ class Interpreter:
         _globals: dict[str, t.Any],
         _locals: dict[str, t.Any],
         functions: dict[str, FnStatement],
+        structs: dict[str, StructStatement],
         depth: int = 0,
     ) -> None:
         self.globals = _globals
         self.locals = _locals
         self.functions = functions
+        self.structs = structs
         self.depth = depth
 
     def _exec(self, ast) -> t.Any:

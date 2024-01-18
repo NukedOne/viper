@@ -8,6 +8,7 @@ ASSERTIONS = {
     "string": ["Hello, world!"],
     "unary_not": [2],
     "float": [3.14],
+    "struct": ["Hello, John."],
 }
 
 
@@ -23,7 +24,7 @@ def test_viper(capsys):
             tokens = tokenizer.tokenize()
             parser = Parser(tokens)
             ast = parser.parse()
-            interpreter = Interpreter({}, {}, {})
+            interpreter = Interpreter({}, {}, {}, {})
             interpreter._exec(ast)
 
             captured = capsys.readouterr()
@@ -58,7 +59,7 @@ def test_operators(capsys, tmp_path):
         tokens = tokenizer.tokenize()
         parser = Parser(tokens)
         ast = parser.parse()
-        interpreter = Interpreter({}, {}, {})
+        interpreter = Interpreter({}, {}, {}, {})
         interpreter._exec(ast)
 
         captured = capsys.readouterr()
@@ -94,7 +95,7 @@ def test_arithmetic_operators(capsys, tmp_path):
         tokens = tokenizer.tokenize()
         parser = Parser(tokens)
         ast = parser.parse()
-        interpreter = Interpreter({}, {}, {})
+        interpreter = Interpreter({}, {}, {}, {})
         interpreter._exec(ast)
 
         captured = capsys.readouterr()
@@ -134,7 +135,7 @@ def test_logical_operators(capsys):
         tokens = tokenizer.tokenize()
         parser = Parser(tokens)
         ast = parser.parse()
-        interpreter = Interpreter({}, {}, {})
+        interpreter = Interpreter({}, {}, {}, {})
         interpreter._exec(ast)
 
         captured = capsys.readouterr()

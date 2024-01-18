@@ -61,6 +61,8 @@ class Tokenizer:
                 case v if v == "i":
                     if self.lookahead("f"):
                         tokens.append(Token(TokenKind.IF, "if"))
+                    elif self.lookahead("mpl"):
+                        tokens.append(Token(TokenKind.IMPL, "impl"))
                     else:
                         tokens.append(self.identifier())
                 case v if v == "f":
@@ -92,6 +94,11 @@ class Tokenizer:
                         tokens.append(Token(TokenKind.RETURN, "return"))
                     else:
                         tokens.append(self.identifier())
+                case v if v == "s":
+                    if self.lookahead("truct"):
+                        tokens.append(Token(TokenKind.STRUCT, "struct"))
+                    else:
+                        tokens.append(self.identifier())
                 case v if v == "t":
                     if self.lookahead("rue"):
                         tokens.append(Token(TokenKind.TRUE, "true"))
@@ -109,6 +116,8 @@ class Tokenizer:
                 case v if v == "+":
                     if self.lookahead("="):
                         tokens.append(Token(TokenKind.PLUS_EQUAL, "+="))
+                    elif self.lookahead("+"):
+                        tokens.append(Token(TokenKind.PLUS_PLUS, "++"))
                     else:
                         tokens.append(Token(TokenKind.PLUS, "+"))
                 case v if v == "-":
@@ -196,8 +205,12 @@ class Tokenizer:
                         tokens.append(Token(TokenKind.GT, ">"))
                 case v if v == '"':
                     tokens.append(self.string())
+                case v if v == ".":
+                    tokens.append(Token(TokenKind.DOT, "."))
+                case v if v == ":":
+                    tokens.append(Token(TokenKind.COLON, "."))
                 case _:
-                    raise Exception("Unknown token.")
+                    raise Exception(f"Unknown token: {self.source[self.current]}")
             self.current += 1
         tokens.append(Token(TokenKind.EOF, ""))
         return tokens
@@ -221,6 +234,8 @@ class TokenKind(enum.Enum):
     WHILE = enum.auto()
     FOR = enum.auto()
     RETURN = enum.auto()
+    STRUCT = enum.auto()
+    IMPL = enum.auto()
     TRUE = enum.auto()
     FALSE = enum.auto()
     NUMBER = enum.auto()
@@ -231,6 +246,7 @@ class TokenKind(enum.Enum):
     STAR = enum.auto()
     SLASH = enum.auto()
     MOD = enum.auto()
+    PLUS_PLUS = enum.auto()
     LT = enum.auto()
     LTE = enum.auto()
     GT = enum.auto()
@@ -261,5 +277,7 @@ class TokenKind(enum.Enum):
     BANG = enum.auto()
     BANG_EQUAL = enum.auto()
     DOUBLE_EQUAL = enum.auto()
+    DOT = enum.auto()
+    COLON = enum.auto()
     SEMICOLON = enum.auto()
     EOF = enum.auto()
