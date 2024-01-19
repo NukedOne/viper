@@ -1,6 +1,55 @@
 # viper
 
-This project is my third attempt at making a dynamic programming language implementation. It ended up being just enough of a tree-walk interpreter to compute fib(40). As you imagine, it's ridiculously slow, first and foremost because walking the tree and directly executing the code is inherently a slow technique compared to bytecode interpreters. Second, it's written in Python. Yes, PyPy helps, but only so much. That said, let's talk about numbers.
+This project is my third attempt at making a dynamic programming language implementation. It is a tree-walk interpreter with a Pratt parser.
+
+The language features
+
+- basic data types
+  - numbers (floats and ints)
+  - booleans
+  - strings
+  - structures
+- operators for the said types
+  - `==`, `!=`, `<`, `>`, `<=`, `>=`
+  - `+`, `-`, `*`, `/`, `%`
+  - `+=`, `-=`, `*=`, `/=`, `%=` (compound assignment)
+  - `&`, `|`, `^`, `~`, `<<`, `>>` (bitwise and/or/xor/not/shift (left|right))
+  - `&=`, `|=`, `^=`, `<<=`, `>>=` (bitwise compound assignment)
+  - `&&`, `||`, `!` (logical and/or/not)
+  - `++` (string concatenation)
+  - `.` (member access)
+  - `,` (comma)
+- control flow
+  - `if`, `else`
+  - `while`
+  - `for` (C-style)
+- functions
+  - `return` is mandatory
+  - recursion!
+- `print` statement
+- methods
+- global scope
+
+The system includes:
+
+  - a tokenizer
+  - a Pratt parser
+  - an interpterer
+
+## Let's talk numbers
+
+As you imagine, it's ridiculously slow, first and foremost because walking the tree and directly executing the code is inherently a slow technique compared to bytecode interpreters. Second, it's written in Python.
+
+### Fibonacci:
+
+```rust
+fn fib(n) { 
+  if (n < 2) return n;
+  return fib(n-1) + fib(n-2);
+}
+
+print fib(40);
+```
 
 ## Numbers
 
@@ -12,6 +61,8 @@ real	33m32,239s
 user	33m30,591s
 sys	0m0,128s
 ```
+
+Yes, PyPy helps, but only so much.
 
 ```
 (env-pypy) alex@smartalex-pc:~/Repositories/viper$ time pypy spam.py
