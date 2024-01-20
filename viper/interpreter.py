@@ -36,5 +36,4 @@ class Interpreter:
             return self.locals[name]
         elif self.is_global(name):
             return self.globals[name]
-        print(f"{self.locals=}")
         raise Exception(f"{name} is not defined.")
