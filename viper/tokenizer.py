@@ -191,6 +191,10 @@ class Tokenizer:
                     tokens.append(Token(TokenKind.LBRACE, "{"))
                 case v if v == "}":
                     tokens.append(Token(TokenKind.RBRACE, "}"))
+                case v if v == "[":
+                    tokens.append(Token(TokenKind.LBRACKET, "["))
+                case v if v == "]":
+                    tokens.append(Token(TokenKind.RBRACKET, "]"))
                 case v if v == ",":
                     tokens.append(Token(TokenKind.COMMA, ","))
                 case v if v == "<":
@@ -273,6 +277,8 @@ class TokenKind(enum.Enum):
     RPAREN = enum.auto()
     LBRACE = enum.auto()
     RBRACE = enum.auto()
+    LBRACKET = enum.auto()
+    RBRACKET = enum.auto()
     COMMA = enum.auto()
     BANG = enum.auto()
     BANG_EQUAL = enum.auto()

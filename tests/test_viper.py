@@ -9,6 +9,7 @@ ASSERTIONS = {
     "unary_not": [2],
     "float": [3.14],
     "struct": ["Hello, John."],
+    "array": [3],
 }
 
 

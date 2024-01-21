@@ -9,12 +9,25 @@ if t.TYPE_CHECKING:
 
 
 class StructLiteralExpression:
-    def __init__(self, name: Token, fields: dict[Token, "Expression"]) -> None:
+    def __init__(
+        self, name: Token, fields: dict[str, "Expression" | "Statement" | None]
+    ) -> None:
         self.name = name
         self.fields = fields
 
     def __repr__(self) -> str:
         return f"{self.name.value} {{ {self.fields} }}"
+
+
+class ArrayLiteralExpression:
+    def __init__(self, initializers: list["Expression"]) -> None:
+        self.initializers = initializers
+
+    def __repr__(self) -> str:
+        return f"[{self.initializers}]"
+
+    def __getitem__(self, item: int) -> "Expression":
+        return self.initializers[item]
 
 
 class Expression(ABC):
@@ -23,7 +36,9 @@ class Expression(ABC):
 
 
 class LiteralExpression(Expression):
-    def __init__(self, expr: int | float | str | StructLiteralExpression) -> None:
+    def __init__(
+        self, expr: int | float | str | StructLiteralExpression | ArrayLiteralExpression
+    ) -> None:
         self.expr = expr
 
     def __repr__(self) -> str:
@@ -181,7 +196,19 @@ class GetExpression(Expression):
         return f"({self.gotten}.{self.member})"
 
     def eval(self, interpreter: "Interpreter") -> t.Any:
-        return self.gotten.eval(interpreter).fields[self.member.value]
+        return self.gotten.eval(interpreter).fields[self.member]
+
+
+class IndexExpression(Expression):
+    def __init__(self, indexee: Expression, index: Expression) -> None:
+        self.indexee = indexee
+        self.index = index
+
+    def __repr__(self) -> str:
+        return f"({self.indexee}[{self.index}])"
+
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        return self.indexee.eval(interpreter)[self.index.eval(interpreter)]
 
 
 class CallExpression(Expression):
@@ -278,7 +305,7 @@ class LiteralParselet(PrefixParselet):
             case l if l.kind == TokenKind.STRUCT:
                 name = parser.consume(TokenKind.IDENTIFIER)
                 parser.consume(TokenKind.LBRACE)
-                fields = {}
+                fields: dict[str, Expression | Statement | None] = {}
                 while not parser.match([TokenKind.RBRACE]):
                     field_name = parser.consume(TokenKind.IDENTIFIER)
                     parser.consume(TokenKind.COLON)
@@ -286,6 +313,12 @@ class LiteralParselet(PrefixParselet):
                     fields[field_name.value] = field_value
                     parser.consume(TokenKind.COMMA)
                 return LiteralExpression(StructLiteralExpression(name, fields))
+            case l if l.kind == TokenKind.LBRACKET:
+                initializers = []
+                while not parser.match([TokenKind.RBRACKET]):
+                    initializers.append(parser.parse_expression(0))
+                    parser.consume(TokenKind.COMMA)
+                return LiteralExpression(ArrayLiteralExpression(initializers))
             case _:
                 raise NotImplementedError(f"Couldn't parse: {token.value}")
 
@@ -318,9 +351,14 @@ class CallParselet(InfixParselet):
                         break
                 parser.consume(TokenKind.RPAREN)
             return CallExpression(left, args)
+        elif token.kind == TokenKind.LBRACKET:
+            index = parser.parse_expression(0)
+            parser.consume(TokenKind.RBRACKET)
+            return IndexExpression(left, index)
         elif token.kind == TokenKind.DOT:
             member = parser.consume(TokenKind.IDENTIFIER)
-            return GetExpression(left, member)
+            return GetExpression(left, member.value)
+        assert False
 
 
 class BinaryOperatorParselet(InfixParselet):
@@ -485,7 +523,9 @@ class ExpressionStatement(Statement):
 
 
 class StructStatement(Statement):
-    def __init__(self, name: Token, fields: dict[str, Expression | Statement]) -> None:
+    def __init__(
+        self, name: Token, fields: dict[str, Expression | Statement | None]
+    ) -> None:
         self.name = name
         self.fields = fields
 
@@ -548,6 +588,7 @@ class Parser:
         TokenKind.BANG: 12,
         TokenKind.DOT: 13,
         TokenKind.LPAREN: 13,
+        TokenKind.LBRACKET: 13,
         TokenKind.NUMBER: 14,
     }
 
@@ -587,6 +628,8 @@ class Parser:
         ):
             self.register(kind, BinaryOperatorParselet())
 
+        self.register(TokenKind.LBRACKET, CallParselet())
+        self.register(TokenKind.LBRACKET, LiteralParselet())
         self.register(TokenKind.LPAREN, CallParselet())
         self.register(TokenKind.DOT, CallParselet())
         self.register(TokenKind.NUMBER, LiteralParselet())
@@ -713,7 +756,7 @@ class Parser:
     def parse_struct_statement(self) -> Statement:
         name = self.consume(TokenKind.IDENTIFIER)
         self.consume(TokenKind.LBRACE)
-        fields = {}
+        fields: dict[str, Expression | Statement | None] = {}
         while not self.match([TokenKind.RBRACE]):
             field_name = self.consume(TokenKind.IDENTIFIER)
             fields[field_name.value] = None
