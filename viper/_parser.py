@@ -194,6 +194,34 @@ class AssignExpression(Expression):
                 case o if o == "^=":
                     array[index] ^= self.rhs.eval(interpreter)
 
+        elif isinstance(self.lhs, GetExpression):
+            target = self.lhs.gotten.eval(interpreter)
+            member = self.lhs.member
+
+            match self.operator:
+                case o if o == "=":
+                    target.expr.fields[member] = self.rhs.eval(interpreter)
+                case o if o == "+=":
+                    target.expr.fields[member] += self.rhs.eval(interpreter)
+                case o if o == "-=":
+                    target.expr.fields[member] -= self.rhs.eval(interpreter)
+                case o if o == "*=":
+                    target.expr.fields[member] *= self.rhs.eval(interpreter)
+                case o if o == "/=":
+                    target.expr.fields[member] /= self.rhs.eval(interpreter)
+                case o if o == "%=":
+                    target.expr.fields[member] %= self.rhs.eval(interpreter)
+                case o if o == ">>=":
+                    target.expr.fields[member] >>= self.rhs.eval(interpreter)
+                case o if o == "<<=":
+                    target.expr.fields[member] <<= self.rhs.eval(interpreter)
+                case o if o == "|=":
+                    target.expr.fields[member] |= self.rhs.eval(interpreter)
+                case o if o == "&=":
+                    target.expr.fields[member] &= self.rhs.eval(interpreter)
+                case o if o == "^=":
+                    target.expr.fields[member] ^= self.rhs.eval(interpreter)
+
 
 class GetExpression(Expression):
     def __init__(self, gotten: Expression, member: str) -> None:
@@ -204,6 +232,8 @@ class GetExpression(Expression):
         return f"({self.gotten}.{self.member})"
 
     def eval(self, interpreter: "Interpreter") -> t.Any:
+        if isinstance(self.gotten, GetExpression):
+            return self.gotten.eval(interpreter).expr.fields[self.member]
         return self.gotten.eval(interpreter).fields[self.member]
 
 
