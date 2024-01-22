@@ -1,0 +1,20 @@
+struct person {
+    name;
+    next;
+}
+
+fn main() {
+    let p = struct person { name: "John", next: struct person {
+        name: "Doe",
+        next: struct person {
+                name: "Lol",
+                next: 0,
+            },
+        },
+    };
+    p.next.next.next = 3;
+    print p.next.next.next;
+    return 0;
+}
+
+main();
