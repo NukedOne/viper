@@ -8,37 +8,6 @@ if t.TYPE_CHECKING:
     from viper.interpreter import Interpreter
 
 
-class Expression(ABC):
-    def eval(self, interpreter: "Interpreter") -> t.Any:
-        pass
-
-
-class LiteralExpression:
-    def __init__(
-        self,
-        expr: int | float | str | "StructLiteralExpression" | "ArrayLiteralExpression",
-    ) -> None:
-        self.expr = expr
-
-    def __repr__(self) -> str:
-        if isinstance(self.expr, float):
-            return "%.16g" % self.expr
-        return str(self.expr)
-
-    def eval(self, interpreter: "Interpreter") -> t.Any:
-        if isinstance(self.expr, StructLiteralExpression):
-            assert isinstance(self.expr, StructLiteralExpression)
-            methods = {
-                k: v
-                for k, v in interpreter.structs[self.expr.name.value].fields.items()
-                if isinstance(v, FnStatement)
-            }
-            for method_name, method in methods.items():
-                assert isinstance(method, FnStatement)
-                self.expr.fields[method_name] = method
-        return self.expr
-
-
 class StructLiteralExpression:
     def __init__(
         self, name: Token, fields: dict[str, "Expression" | "Statement" | None]
@@ -59,6 +28,36 @@ class ArrayLiteralExpression:
 
     def __getitem__(self, item: int) -> "Expression":
         return self.initializers[item]
+
+
+class Expression(ABC):
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        pass
+
+
+class LiteralExpression(Expression):
+    def __init__(
+        self, expr: int | float | str | StructLiteralExpression | ArrayLiteralExpression
+    ) -> None:
+        self.expr = expr
+
+    def __repr__(self) -> str:
+        if isinstance(self.expr, float):
+            return "%.16g" % self.expr
+        return str(self.expr)
+
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        if isinstance(self.expr, StructLiteralExpression):
+            assert isinstance(self.expr, StructLiteralExpression)
+            methods = {
+                k: v
+                for k, v in interpreter.structs[self.expr.name.value].fields.items()
+                if isinstance(v, FnStatement)
+            }
+            for method_name, method in methods.items():
+                assert isinstance(method, FnStatement)
+                self.expr.fields[method_name] = method
+        return self.expr
 
 
 class VariableExpression(Expression):
