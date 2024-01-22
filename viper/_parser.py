@@ -8,36 +8,15 @@ if t.TYPE_CHECKING:
     from viper.interpreter import Interpreter
 
 
-class StructLiteralExpression:
-    def __init__(
-        self, name: Token, fields: dict[str, "Expression" | "Statement" | None]
-    ) -> None:
-        self.name = name
-        self.fields = fields
-
-    def __repr__(self) -> str:
-        return f"{self.name.value} {{ {self.fields} }}"
-
-
-class ArrayLiteralExpression:
-    def __init__(self, initializers: list["Expression"]) -> None:
-        self.initializers = initializers
-
-    def __repr__(self) -> str:
-        return f"[{self.initializers}]"
-
-    def __getitem__(self, item: int) -> "Expression":
-        return self.initializers[item]
-
-
 class Expression(ABC):
     def eval(self, interpreter: "Interpreter") -> t.Any:
         pass
 
 
-class LiteralExpression(Expression):
+class LiteralExpression:
     def __init__(
-        self, expr: int | float | str | StructLiteralExpression | ArrayLiteralExpression
+        self,
+        expr: int | float | str | "StructLiteralExpression" | "ArrayLiteralExpression",
     ) -> None:
         self.expr = expr
 
@@ -58,6 +37,28 @@ class LiteralExpression(Expression):
                 assert isinstance(method, FnStatement)
                 self.expr.fields[method_name] = method
         return self.expr
+
+
+class StructLiteralExpression:
+    def __init__(
+        self, name: Token, fields: dict[str, "Expression" | "Statement" | None]
+    ) -> None:
+        self.name = name
+        self.fields = fields
+
+    def __repr__(self) -> str:
+        return f"{self.name.value} {{ {self.fields} }}"
+
+
+class ArrayLiteralExpression:
+    def __init__(self, initializers: list["Expression"]) -> None:
+        self.initializers = initializers
+
+    def __repr__(self) -> str:
+        return f"[{self.initializers}]"
+
+    def __getitem__(self, item: int) -> "Expression":
+        return self.initializers[item]
 
 
 class VariableExpression(Expression):
