@@ -8,9 +8,20 @@ if t.TYPE_CHECKING:
     from viper.interpreter import Interpreter
 
 
+class Expression(ABC):
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        pass
+
+
+class Statement(ABC):
+    @abstractmethod
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        pass
+
+
 class StructLiteralExpression:
     def __init__(
-        self, name: Token, fields: dict[str, "Expression" | "Statement" | None]
+        self, name: Token, fields: dict[str, Expression | Statement | None]
     ) -> None:
         self.name = name
         self.fields = fields
@@ -29,10 +40,8 @@ class ArrayLiteralExpression:
     def __getitem__(self, item: int) -> "Expression":
         return self.initializers[item]
 
-
-class Expression(ABC):
-    def eval(self, interpreter: "Interpreter") -> t.Any:
-        pass
+    def __setitem__(self, index: int, item: Expression) -> None:
+        self.initializers[index] = item
 
 
 class LiteralExpression(Expression):
@@ -128,63 +137,62 @@ class AssignExpression(Expression):
         return f"({self.lhs} {self.operator} {self.rhs})"
 
     def eval(self, interpreter: "Interpreter") -> t.Any:
-        assert isinstance(self.lhs, VariableExpression)
-        match self.operator:
-            case o if o == "=":
-                if interpreter.depth > 0:
-                    interpreter.locals[self.lhs.name] = self.rhs.eval(interpreter)
-                else:
-                    interpreter.globals[self.lhs.name] = self.rhs.eval(interpreter)
-            case o if o == "+=":
-                if interpreter.depth > 0:
-                    interpreter.locals[self.lhs.name] += self.rhs.eval(interpreter)
-                else:
-                    interpreter.globals[self.lhs.name] += self.rhs.eval(interpreter)
-            case o if o == "-=":
-                if interpreter.depth > 0:
-                    interpreter.locals[self.lhs.name] -= self.rhs.eval(interpreter)
-                else:
-                    interpreter.globals[self.lhs.name] -= self.rhs.eval(interpreter)
-            case o if o == "*=":
-                if interpreter.depth > 0:
-                    interpreter.locals[self.lhs.name] *= self.rhs.eval(interpreter)
-                else:
-                    interpreter.globals[self.lhs.name] *= self.rhs.eval(interpreter)
-            case o if o == "/=":
-                if interpreter.depth > 0:
-                    interpreter.locals[self.lhs.name] /= self.rhs.eval(interpreter)
-                else:
-                    interpreter.globals[self.lhs.name] /= self.rhs.eval(interpreter)
-            case o if o == "%=":
-                if interpreter.depth > 0:
-                    interpreter.locals[self.lhs.name] %= self.rhs.eval(interpreter)
-                else:
-                    interpreter.globals[self.lhs.name] %= self.rhs.eval(interpreter)
-            case o if o == ">>=":
-                if interpreter.depth > 0:
-                    interpreter.locals[self.lhs.name] >>= self.rhs.eval(interpreter)
-                else:
-                    interpreter.globals[self.lhs.name] >>= self.rhs.eval(interpreter)
-            case o if o == "<<=":
-                if interpreter.depth > 0:
-                    interpreter.locals[self.lhs.name] <<= self.rhs.eval(interpreter)
-                else:
-                    interpreter.globals[self.lhs.name] <<= self.rhs.eval(interpreter)
-            case o if o == "|=":
-                if interpreter.depth > 0:
-                    interpreter.locals[self.lhs.name] |= self.rhs.eval(interpreter)
-                else:
-                    interpreter.globals[self.lhs.name] |= self.rhs.eval(interpreter)
-            case o if o == "&=":
-                if interpreter.depth > 0:
-                    interpreter.locals[self.lhs.name] &= self.rhs.eval(interpreter)
-                else:
-                    interpreter.globals[self.lhs.name] &= self.rhs.eval(interpreter)
-            case o if o == "^=":
-                if interpreter.depth > 0:
-                    interpreter.locals[self.lhs.name] ^= self.rhs.eval(interpreter)
-                else:
-                    interpreter.globals[self.lhs.name] ^= self.rhs.eval(interpreter)
+        if isinstance(self.lhs, VariableExpression):
+            storage = (
+                interpreter.locals if interpreter.depth > 0 else interpreter.globals
+            )
+
+            match self.operator:
+                case o if o == "=":
+                    storage[self.lhs.name] = self.rhs.eval(interpreter)
+                case o if o == "+=":
+                    storage[self.lhs.name] += self.rhs.eval(interpreter)
+                case o if o == "-=":
+                    storage[self.lhs.name] -= self.rhs.eval(interpreter)
+                case o if o == "*=":
+                    storage[self.lhs.name] *= self.rhs.eval(interpreter)
+                case o if o == "/=":
+                    storage[self.lhs.name] /= self.rhs.eval(interpreter)
+                case o if o == "%=":
+                    storage[self.lhs.name] %= self.rhs.eval(interpreter)
+                case o if o == ">>=":
+                    storage[self.lhs.name] >>= self.rhs.eval(interpreter)
+                case o if o == "<<=":
+                    storage[self.lhs.name] <<= self.rhs.eval(interpreter)
+                case o if o == "|=":
+                    storage[self.lhs.name] |= self.rhs.eval(interpreter)
+                case o if o == "&=":
+                    storage[self.lhs.name] &= self.rhs.eval(interpreter)
+                case o if o == "^=":
+                    storage[self.lhs.name] ^= self.rhs.eval(interpreter)
+
+        elif isinstance(self.lhs, IndexExpression):
+            array = self.lhs.indexee.eval(interpreter)
+            index = self.lhs.index.eval(interpreter)
+
+            match self.operator:
+                case o if o == "=":
+                    array[index] = self.rhs.eval(interpreter)
+                case o if o == "+=":
+                    array[index] += self.rhs.eval(interpreter)
+                case o if o == "-=":
+                    array[index] -= self.rhs.eval(interpreter)
+                case o if o == "*=":
+                    array[index] *= self.rhs.eval(interpreter)
+                case o if o == "/=":
+                    array[index] /= self.rhs.eval(interpreter)
+                case o if o == "%=":
+                    array[index] %= self.rhs.eval(interpreter)
+                case o if o == ">>=":
+                    array[index] >>= self.rhs.eval(interpreter)
+                case o if o == "<<=":
+                    array[index] <<= self.rhs.eval(interpreter)
+                case o if o == "|=":
+                    array[index] |= self.rhs.eval(interpreter)
+                case o if o == "&=":
+                    array[index] &= self.rhs.eval(interpreter)
+                case o if o == "^=":
+                    array[index] ^= self.rhs.eval(interpreter)
 
 
 class GetExpression(Expression):
@@ -401,12 +409,6 @@ class BinaryOperatorParselet(InfixParselet):
                 return AssignExpression(left, right, token.value)
             case _:
                 raise Exception("Unknown operator.")
-
-
-class Statement(ABC):
-    @abstractmethod
-    def exec(self, interpreter: "Interpreter") -> t.Any:
-        pass
 
 
 class LetStatement(Statement):
