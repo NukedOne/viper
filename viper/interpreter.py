@@ -4,18 +4,11 @@ from viper._parser import FnStatement, StructStatement
 
 
 class Interpreter:
-    def __init__(
-        self,
-        _globals: dict[str, t.Any],
-        _locals: dict[str, t.Any],
-        functions: dict[str, FnStatement],
-        structs: dict[str, StructStatement],
-        depth: int = 0,
-    ) -> None:
-        self.globals = _globals
-        self.locals = _locals
-        self.functions = functions
-        self.structs = structs
+    def __init__(self, depth: int = 0) -> None:
+        self.globals: dict[str, t.Any] = {}
+        self.locals: dict[str, t.Any] = {}
+        self.functions: dict[str, FnStatement] = {}
+        self.structs: dict[str, StructStatement] = {}
         self.depth = depth
 
     def _exec(self, ast) -> t.Any:
