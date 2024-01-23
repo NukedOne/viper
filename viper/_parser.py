@@ -19,35 +19,8 @@ class Statement(ABC):
         pass
 
 
-class StructLiteralExpression:
-    def __init__(
-        self, name: Token, fields: dict[str, Expression | Statement | None]
-    ) -> None:
-        self.name = name
-        self.fields = fields
-
-    def __repr__(self) -> str:
-        return f"{self.name.value} {{ {self.fields} }}"
-
-
-class ArrayLiteralExpression:
-    def __init__(self, initializers: list["Expression"]) -> None:
-        self.initializers = initializers
-
-    def __repr__(self) -> str:
-        return f"[{self.initializers}]"
-
-    def __getitem__(self, item: int) -> "Expression":
-        return self.initializers[item]
-
-    def __setitem__(self, index: int, item: Expression) -> None:
-        self.initializers[index] = item
-
-
 class LiteralExpression(Expression):
-    def __init__(
-        self, expr: int | float | str | StructLiteralExpression | ArrayLiteralExpression
-    ) -> None:
+    def __init__(self, expr: int | float | str) -> None:
         self.expr = expr
 
     def __repr__(self) -> str:
@@ -56,16 +29,6 @@ class LiteralExpression(Expression):
         return str(self.expr)
 
     def eval(self, interpreter: "Interpreter") -> t.Any:
-        if isinstance(self.expr, StructLiteralExpression):
-            assert isinstance(self.expr, StructLiteralExpression)
-            methods = {
-                k: v
-                for k, v in interpreter.structs[self.expr.name.value].fields.items()
-                if isinstance(v, FnStatement)
-            }
-            for method_name, method in methods.items():
-                assert isinstance(method, FnStatement)
-                self.expr.fields[method_name] = method
         return self.expr
 
 
@@ -200,27 +163,27 @@ class AssignExpression(Expression):
 
             match self.operator:
                 case o if o == "=":
-                    target.expr.fields[member] = self.rhs.eval(interpreter)
+                    target.fields[member] = self.rhs.eval(interpreter)
                 case o if o == "+=":
-                    target.expr.fields[member] += self.rhs.eval(interpreter)
+                    target.fields[member] += self.rhs.eval(interpreter)
                 case o if o == "-=":
-                    target.expr.fields[member] -= self.rhs.eval(interpreter)
+                    target.fields[member] -= self.rhs.eval(interpreter)
                 case o if o == "*=":
-                    target.expr.fields[member] *= self.rhs.eval(interpreter)
+                    target.fields[member] *= self.rhs.eval(interpreter)
                 case o if o == "/=":
-                    target.expr.fields[member] /= self.rhs.eval(interpreter)
+                    target.fields[member] /= self.rhs.eval(interpreter)
                 case o if o == "%=":
-                    target.expr.fields[member] %= self.rhs.eval(interpreter)
+                    target.fields[member] %= self.rhs.eval(interpreter)
                 case o if o == ">>=":
-                    target.expr.fields[member] >>= self.rhs.eval(interpreter)
+                    target.fields[member] >>= self.rhs.eval(interpreter)
                 case o if o == "<<=":
-                    target.expr.fields[member] <<= self.rhs.eval(interpreter)
+                    target.fields[member] <<= self.rhs.eval(interpreter)
                 case o if o == "|=":
-                    target.expr.fields[member] |= self.rhs.eval(interpreter)
+                    target.fields[member] |= self.rhs.eval(interpreter)
                 case o if o == "&=":
-                    target.expr.fields[member] &= self.rhs.eval(interpreter)
+                    target.fields[member] &= self.rhs.eval(interpreter)
                 case o if o == "^=":
-                    target.expr.fields[member] ^= self.rhs.eval(interpreter)
+                    target.fields[member] ^= self.rhs.eval(interpreter)
 
 
 class GetExpression(Expression):
@@ -232,8 +195,6 @@ class GetExpression(Expression):
         return f"({self.gotten}.{self.member})"
 
     def eval(self, interpreter: "Interpreter") -> t.Any:
-        if isinstance(self.gotten, GetExpression):
-            return self.gotten.eval(interpreter).expr.fields[self.member]
         return self.gotten.eval(interpreter).fields[self.member]
 
 
@@ -310,6 +271,39 @@ class UnaryExpression(Expression):
                 raise NotImplementedError()
 
 
+class StructLiteralExpression(Expression):
+    def __init__(
+        self, name: Token, fields: dict[str, Expression | Statement | None]
+    ) -> None:
+        self.name = name.value
+        self.fields = fields
+
+    def __repr__(self) -> str:
+        return f"{self.name} {{ {self.fields} }}"
+
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        methods = {
+            k: v
+            for k, v in interpreter.structs[self.name].fields.items()
+            if isinstance(v, FnStatement)
+        }
+        for method_name, method in methods.items():
+            assert isinstance(method, FnStatement)
+            self.fields[method_name] = method
+        return self
+
+
+class ArrayLiteralExpression(Expression):
+    def __init__(self, initializers: list["Expression"]) -> None:
+        self.initializers = initializers
+
+    def __repr__(self) -> str:
+        return f"[{self.initializers}]"
+
+    def eval(self, interpreter: "Interpreter") -> t.Any:
+        return self.initializers
+
+
 @dataclass
 class PrefixExpression:
     token: Token
@@ -350,13 +344,13 @@ class LiteralParselet(PrefixParselet):
                     field_value = parser.parse_expression(0)
                     fields[field_name.value] = field_value
                     parser.consume(TokenKind.COMMA)
-                return LiteralExpression(StructLiteralExpression(name, fields))
+                return StructLiteralExpression(name, fields)
             case l if l.kind == TokenKind.LBRACKET:
                 initializers = []
                 while not parser.match([TokenKind.RBRACKET]):
                     initializers.append(parser.parse_expression(0))
                     parser.consume(TokenKind.COMMA)
-                return LiteralExpression(ArrayLiteralExpression(initializers))
+                return ArrayLiteralExpression(initializers)
             case _:
                 raise NotImplementedError(f"Couldn't parse: {token.value}")
 
