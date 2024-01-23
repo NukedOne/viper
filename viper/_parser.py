@@ -9,6 +9,7 @@ if t.TYPE_CHECKING:
 
 
 class Expression(ABC):
+    @abstractmethod
     def eval(self, interpreter: "Interpreter") -> t.Any:
         pass
 
