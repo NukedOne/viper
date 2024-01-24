@@ -10,6 +10,7 @@ ASSERTIONS = {
     "float": [3.14],
     "struct": ["Hello, John."],
     "array": [3],
+    "break": [0, 1, 2, 0, 1, 2],
 }
 
 
