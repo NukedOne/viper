@@ -58,6 +58,16 @@ class Tokenizer:
                 self.current += 1
                 continue
             match self.source[self.current]:
+                case v if v == "b":
+                    if self.lookahead("reak"):
+                        tokens.append(Token(TokenKind.BREAK, "break"))
+                    else:
+                        tokens.append(self.identifier())
+                case v if v == "c":
+                    if self.lookahead("ontinue"):
+                        tokens.append(Token(TokenKind.CONTINUE, "continue"))
+                    else:
+                        tokens.append(self.identifier())
                 case v if v == "i":
                     if self.lookahead("f"):
                         tokens.append(Token(TokenKind.IF, "if"))
@@ -237,6 +247,8 @@ class TokenKind(enum.Enum):
     FN = enum.auto()
     WHILE = enum.auto()
     FOR = enum.auto()
+    BREAK = enum.auto()
+    CONTINUE = enum.auto()
     RETURN = enum.auto()
     STRUCT = enum.auto()
     IMPL = enum.auto()

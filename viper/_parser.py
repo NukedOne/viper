@@ -1,6 +1,7 @@
 import typing as t
 from viper.tokenizer import Token, TokenKind
 from viper.ast import (
+    BreakStatement,
     Expression,
     LiteralExpression,
     StructLiteralExpression,
@@ -374,6 +375,14 @@ class Parser:
             methods.append(self.parse_statement())
         return ImplStatement(name, methods)
 
+    def parse_break_statement(self) -> Statement:
+        self.consume(TokenKind.SEMICOLON)
+        return BreakStatement()
+
+    def parse_continue_statement(self) -> Statement:
+        self.consume(TokenKind.SEMICOLON)
+        return BreakStatement()
+
     def parse_statement(self) -> Statement:
         if self.match([TokenKind.LET]):
             return self.parse_let_statement()
@@ -385,6 +394,10 @@ class Parser:
             return self.parse_while_statement()
         elif self.match([TokenKind.FOR]):
             return self.parse_for_statement()
+        elif self.match([TokenKind.BREAK]):
+            return self.parse_break_statement()
+        elif self.match([TokenKind.CONTINUE]):
+            return self.parse_continue_statement()
         elif self.match([TokenKind.IF]):
             return self.parse_if_statement()
         elif self.match([TokenKind.RETURN]):

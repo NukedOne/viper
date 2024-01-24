@@ -1,3 +1,4 @@
+import enum
 import typing as t
 from viper.tokenizer import Token
 from abc import ABC, abstractmethod
@@ -380,7 +381,12 @@ class WhileStatement(Statement):
 
     def exec(self, interpreter: "Interpreter") -> t.Any:
         while self.condition.eval(interpreter):
-            self.body.exec(interpreter)
+            retval = self.body.exec(interpreter)
+            match retval:
+                case ControlFlow.CONTINUE:
+                    continue
+                case ControlFlow.BREAK:
+                    break
 
 
 class ForStatement(Statement):
@@ -401,7 +407,13 @@ class ForStatement(Statement):
         assert isinstance(self.initializer.lhs, VariableExpression)
         self.initializer.eval(interpreter)
         while self.condition.eval(interpreter):
-            self.body.exec(interpreter)
+            retval = self.body.exec(interpreter)
+            match retval:
+                case ControlFlow.CONTINUE:
+                    continue
+                case ControlFlow.BREAK:
+                    break
+
             self.advancement.eval(interpreter)
         if interpreter.depth > 0:
             del interpreter.locals[self.initializer.lhs.name]
@@ -443,3 +455,30 @@ class ImplStatement(Statement):
         for method in self.methods:
             assert isinstance(method, FnStatement)
             interpreter.structs[self.name.value].fields[method.name] = method
+
+
+class ControlFlow(enum.Enum):
+    BREAK = 0
+    CONTINUE = 1
+
+
+class BreakStatement(Statement):
+    def __init__(self):
+        pass
+
+    def __repr__(self) -> str:
+        return "Break"
+
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        return ControlFlow.BREAK
+
+
+class ContinueStatement(Statement):
+    def __init__(self):
+        pass
+
+    def __repr__(self) -> str:
+        return "Continue"
+
+    def exec(self, interpreter: "Interpreter") -> t.Any:
+        return ControlFlow.CONTINUE
