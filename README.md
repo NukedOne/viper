@@ -9,6 +9,7 @@ The language features
   - booleans
   - strings
   - structures
+  - lists
 - operators for the said types
   - `==`, `!=`, `<`, `>`, `<=`, `>=`
   - `+`, `-`, `*`, `/`, `%`
